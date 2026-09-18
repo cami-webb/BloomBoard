@@ -13,17 +13,17 @@ s3:
   write_path: "write/bloomboard"
 
 # how many days ahead to forecast
-max_horizon: 7
+max_horizon: 5
 
 # "daily" runs for today and appends today's readings to the training data
-# run_mode: "daily"
+run_mode: "daily"
 
 # to run a historical backtest instead, comment out run_mode "daily" above
 # uncomment the lines below, and fill in the dates you want
-run_mode: "date_range"
-date_range:
-  start: "2021-01-01"
-  end: "2024-12-31"
+#run_mode: "date_range"
+#date_range:
+#  start: "2021-01-01"
+#  end: "2024-12-31"
 
 buoys:
   a01:

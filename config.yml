@@ -13,7 +13,7 @@ s3:
   write_path: "write/bloomboard"
 
 # how many days ahead to forecast
-max_horizon: 5
+max_horizon: 7
 
 # "daily" runs for today and appends today's readings to the training data
 run_mode: "daily"

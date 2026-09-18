@@ -1,5 +1,5 @@
 # Forecasts chlorophyll forward in time every day, differently depending
-# on whether today is a "bloom" or "calm" day. See README for full design
+# on whether today is a "bloom" or "calm" day
 
 library(ranger)
 library(dplyr)
@@ -11,7 +11,7 @@ bloom_peak_quantile <- 0.7
 bloom_duration_quantile <- 0.7
 bloom_decline_quantile <- 0.7
 
-# Fixed bloom threshold (µg/L) (see README for why not dynamic)
+# Fixed bloom threshold (µg/L); a dynamic mean classified calm days as blooms
 compute_bloom_threshold <- function(data) 5
 
 # Empirical median fraction of an event's duration from start to peak
@@ -84,7 +84,7 @@ compute_bloom_training_panel <- function(data, covs, threshold) {
   onset_value <- ave(bloom_rows$chlorophyll, bloom_event_id, FUN = function(x) x[1])
   bloom_rows$days_since_onset <- ave(seq_along(bloom_event_id), bloom_event_id, FUN = seq_along)
   bloom_rows$rise_rate_since_onset <- (bloom_rows$chlorophyll - onset_value) / bloom_rows$days_since_onset
-  bloom_rows$doy <- lubridate::yday(bloom_rows$date)   # seasonality -- see README
+  bloom_rows$doy <- lubridate::yday(bloom_rows$date)   # seasonality
 
   bloom_rows$remaining_peak <- ave(bloom_rows$chlorophyll, bloom_event_id,
                                    FUN = function(x) rev(cummax(rev(x))))

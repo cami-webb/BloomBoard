@@ -29,4 +29,4 @@ jobs:
 
       - name: Ping healthcheck
         run: |
-          curl -fsS -m 10 --retry 5 https://hc-ping.com/34e8099e-e13c-404b-9821-7e26111728c8
+          Rscript -e 'httr::GET("https://hc-ping.com/34e8099e-e13c-404b-9821-7e26111728c8", httr::timeout(10))'

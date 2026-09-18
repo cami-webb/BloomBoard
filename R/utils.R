@@ -13,7 +13,7 @@ load_config <- function(path = "config.yml") {
 
 # Looks up data[[col]] on target_date, falling back to the most recent
 # value within max_lookback days, then that day-of-year's climatological
-# mean. See README for why
+# mean
 lookup_with_fallback <- function(data, col, target_date, max_lookback = 5) {
   for (offset in 0:max_lookback) {
     v <- data[[col]][data$date == (target_date - offset)]

@@ -33,7 +33,7 @@ jobs:
       - name: Install R packages
         run: |
           Rscript -e 'options(repos=c(CRAN="https://cloud.r-project.org"))'
-          Rscript -e 'pkgs <- c("yaml","httr","readr","dplyr","lubridate","aws.s3","ggplot2","plotly","htmltools","purrr","tidyr","knitr","patchwork"); need <- pkgs[!pkgs %in% rownames(installed.packages())]; if(length(need)) install.packages(need, Ncpus = 2)'
+          Rscript -e 'pkgs <- c("yaml","httr","readr","dplyr","lubridate","aws.s3","ggplot2","plotly","htmltools","purrr","tidyr","knitr","patchwork","ranger"); need <- pkgs[!pkgs %in% rownames(installed.packages())]; if(length(need)) install.packages(need, Ncpus = 2)'
 
       - name: Render backtest page
         run: quarto render dashboard/backtest.qmd --execute-dir "$GITHUB_WORKSPACE"

@@ -25,6 +25,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # eco4cast/rocker-neon4cast doesn't ship curl/jq, which the
+      # quarto-actions/setup download script needs
+      - name: Install system deps for quarto setup
+        run: apt-get update && apt-get install -y --no-install-recommends curl jq
+
       - uses: quarto-dev/quarto-actions/setup@v2
 
       - name: Install R packages

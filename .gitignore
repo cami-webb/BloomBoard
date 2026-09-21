@@ -1,0 +1,5 @@
+.env.sh
+logs/
+validation/
+dashboard/_site/
+.quarto/

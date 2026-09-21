@@ -1,0 +1,140 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "BloomBoard"
+  navbar:
+    left:
+      - text: "<img src='img/bu.jpg' style='height:45px;'>"
+        href: index.qmd
+      - text: "<img src='img/mwra.png' style='height:45px;'>"
+        href: index.qmd
+    right:
+      - text: "Today"
+        href: index.qmd
+      - text: "Backtest Validations"
+        href: backtest.qmd
+      - text: "Documentation"
+        href: documentation.qmd
+      - text: "Acknowledgements"
+        href: acknowledgements.qmd
+
+format:
+  html:
+    embed-resources: true
+    theme: flatly
+    page-layout: full
+    anchor-sections: false
+    include-in-header:
+      text: |
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&display=swap');
+        body, h1, h2, h3, p, blockquote, .plotly {
+          font-family: 'Barlow Condensed', -apple-system, sans-serif;
+          font-weight: 500;
+          font-size: 22px;
+        }
+        .navbar-brand-container {
+          margin-left: 2rem;
+        }
+        .navbar-brand-container .navbar-brand {
+          font-size: 1.8rem;
+        }
+        #quarto-document-content {
+          grid-column: 1 / -1 !important;
+          max-width: 1600px !important;
+          margin: 0 auto !important;
+          width: 100% !important;
+        }
+        #title-block-header {
+          margin-top: 2rem !important;
+          text-align: center;
+        }
+        #title-block-header h1.title {
+          font-size: 5rem !important;
+          font-weight: 700 !important;
+        }
+        .today-line {
+          text-align: center;
+          font-size: 2rem;
+          font-weight: 600;
+          color: #444;
+          margin: 0.5rem 0 2.5rem 0;
+        }
+        .buoy-heading {
+          text-align: left;
+          max-width: 1300px;
+          margin: 3rem auto 1rem auto;
+          font-size: 3rem;
+          font-weight: 700;
+        }
+        .html-widget {
+          margin: 0 auto 3rem auto !important;
+          max-width: 1300px;
+          width: 100% !important;
+        }
+        .bloom-status {
+          text-align: center;
+          max-width: 1300px;
+          margin: 1.5rem auto 2.5rem auto;
+          padding: 1.5rem 2rem;
+          border-left: 4px solid #0072B2;
+          background: #f7f9fb;
+          font-size: 1.5rem;
+        }
+        .bloom-status p {
+          margin: 0.6rem 0;
+        }
+        .buoy-map-title {
+          text-align: left;
+          max-width: 1300px;
+          margin: 1rem auto 0 auto;
+          font-size: 1.8rem;
+          font-weight: 700;
+        }
+        .buoy-map {
+          margin: 0 auto 0 auto !important;
+          max-width: 1300px;
+        }
+        .buoy-coords {
+          max-width: 1300px;
+          margin: 0 auto 2.5rem auto;
+          text-align: right;
+          font-size: 1.2rem;
+          color: #666;
+        }
+        .chart-caption {
+          max-width: 1300px;
+          margin: -2rem auto 3rem auto;
+          font-size: 1rem;
+          color: #666;
+          text-align: left;
+        }
+        .section-caption {
+          max-width: 1300px;
+          margin: 0 auto 1rem auto;
+          font-size: 1.1rem;
+          color: #666;
+          text-align: left;
+        }
+        .csv-link a {
+          color: #0072B2;
+        }
+        .data-status {
+          color: #666;
+        }
+        .data-warning {
+          color: #B00020;
+          font-weight: 600;
+        }
+        </style>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          var logoList = document.querySelector('#navbarCollapse ul.me-auto');
+          var brand = document.querySelector('.navbar-brand-container');
+          if (logoList && brand && brand.parentNode) {
+            brand.parentNode.insertBefore(logoList, brand);
+          }
+        });
+        </script>

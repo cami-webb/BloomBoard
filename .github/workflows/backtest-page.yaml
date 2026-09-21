@@ -1,0 +1,48 @@
+name: BloomBoard Backtest Page
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      OSN_KEY: ${{ secrets.OSN_KEY }}
+      OSN_SECRET: ${{ secrets.OSN_SECRET }}
+
+    container: eco4cast/rocker-neon4cast:latest
+
+    steps:
+      - run: git config --system --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      - name: Install R packages
+        run: |
+          Rscript -e 'options(repos=c(CRAN="https://cloud.r-project.org"))'
+          Rscript -e 'pkgs <- c("yaml","httr","readr","dplyr","lubridate","aws.s3","ggplot2","plotly","htmltools","purrr","tidyr","knitr","patchwork"); need <- pkgs[!pkgs %in% rownames(installed.packages())]; if(length(need)) install.packages(need, Ncpus = 2)'
+
+      - name: Render backtest page
+        run: quarto render dashboard/backtest.qmd --execute-dir "$GITHUB_WORKSPACE"
+
+      # Copies just backtest.html onto gh-pages instead of wiping the
+      # whole branch, so the daily-updated pages aren't touched
+      - name: Publish to gh-pages
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          cp dashboard/_site/backtest.html /tmp/backtest.html
+          git fetch origin gh-pages || true
+          git checkout gh-pages 2>/dev/null || git checkout --orphan gh-pages
+          cp /tmp/backtest.html .
+          git add backtest.html
+          git commit -m "update backtest page" || echo "nothing to commit"
+          git push origin gh-pages

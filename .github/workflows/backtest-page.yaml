@@ -38,16 +38,31 @@ jobs:
       - name: Render backtest page
         run: quarto render dashboard/backtest.qmd --execute-dir "$GITHUB_WORKSPACE"
 
-      # Copies just backtest.html onto gh-pages instead of wiping the
-      # whole branch, so the daily-updated pages aren't touched
+      # Publishes into an isolated worktree, not the main checkout's working
+      # directory -- `git checkout --orphan` on the latter keeps the entire
+      # index from the just-checked-out main branch (it doesn't clear the
+      # working tree), so a prior version of this step committed the whole
+      # repo onto gh-pages by accident. Also scrubs anything that isn't one
+      # of the known published files on every run, so it self-heals that
+      # branch rather than trusting it stays clean; index/documentation/
+      # acknowledgements.html (published separately by dashboard.yaml) are
+      # explicitly kept.
       - name: Publish to gh-pages
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
           cp dashboard/_site/backtest.html /tmp/backtest.html
           git fetch origin gh-pages || true
-          git checkout gh-pages 2>/dev/null || git checkout --orphan gh-pages
+          rm -rf /tmp/gh-pages-wt
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            git worktree add /tmp/gh-pages-wt gh-pages
+          else
+            git worktree add --orphan -b gh-pages /tmp/gh-pages-wt
+          fi
+          cd /tmp/gh-pages-wt
+          find . -maxdepth 1 -type f ! -name 'index.html' ! -name 'documentation.html' ! -name 'acknowledgements.html' ! -name 'backtest.html' -delete
+          find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' -exec rm -rf {} +
           cp /tmp/backtest.html .
-          git add backtest.html
+          git add -A
           git commit -m "update backtest page" || echo "nothing to commit"
           git push origin gh-pages

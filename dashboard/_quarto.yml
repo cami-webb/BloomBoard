@@ -41,6 +41,16 @@ format:
         .navbar-brand-container .navbar-brand {
           font-size: 1.8rem;
         }
+        /* Bootstrap sets order: 2 on .navbar-brand-container for its own
+           responsive layout, which silently overrides DOM order -- the JS
+           move alone was never enough. Forcing the logo list's flex order
+           below the brand's is what actually determines visual position. */
+        .navbar-nav.me-auto {
+          order: -1 !important;
+        }
+        .navbar-brand-container {
+          order: 2 !important;
+        }
         #quarto-document-content {
           grid-column: 1 / -1 !important;
           max-width: 1600px !important;

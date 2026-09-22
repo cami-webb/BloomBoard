@@ -93,16 +93,26 @@ compute_metrics <- function(pred, obs) {
 
 ## Year overview and 3-day-ahead forecasts
 
-Each row is one year. Left: every forecast's full trajectory (lead 1-5
-days). Right: only the 3-day-ahead point from each forecast.
+Each row is one year. Full trajectory: every forecast's lead 1-5 days.
+3-day-ahead: only the 3-day-ahead point from each forecast.
 
 ```{r panel_plot}
 #| echo: false
+#| warning: false
 #| fig.width: 16
 #| fig.height: 22
+#| fig.align: center
 years <- 2021:2024
 PLOT_LEAD_LIMIT <- 5
 
+# facet_grid(year ~ type, scales = "free") was tried here, but facet_grid's
+# "free" x only varies PER COLUMN, not per row -- every row in a column
+# still shares one x-axis by construction, so every year's row ended up
+# spanning 2021-2025 instead of just its own year. Individual ggplots (each
+# with their own coord_cartesian xlim, as originally) avoid that entirely,
+# combined into a labeled grid via patchwork::area() so row/column labels
+# still don't have to be baked into each panel's own title.
+LABEL_SIZE <- 7
 year_panels <- purrr::map(years, function(yr) {
   yr_start <- as.Date(paste0(yr, "-01-01"))
   yr_end <- as.Date(paste0(yr, "-12-31"))
@@ -115,68 +125,90 @@ year_panels <- purrr::map(years, function(yr) {
     geom_line(data = fc_yr, aes(date, chlorophyll_forecast, group = ref_date, color = branch),
              alpha = 0.5, linewidth = 0.4) +
     geom_hline(yintercept = bloom_threshold, linetype = "dashed", color = "red") +
-    scale_color_manual(values = c("Bloom forecast" = "#0072B2", "Calm forecast" = "#56B4E9"), name = NULL) +
+    scale_color_manual(values = c("Bloom forecast" = "#E69F00", "Calm forecast" = "#0072B2"), name = NULL) +
     coord_cartesian(xlim = c(yr_start, yr_end)) +
-    labs(x = NULL, y = "Chlorophyll (ug/L)", title = paste0(yr, ": full trajectory")) +
-    theme_bw(base_size = 11)
+    labs(x = NULL, y = "Chlorophyll (ug/L)") +
+    theme_bw(base_size = 16)
 
   fc_yr3 <- forecasts %>% filter(ref_date >= yr_start, ref_date <= yr_end, lead_time == 3)
   p_lead3 <- ggplot() +
     geom_line(data = real_yr, aes(date, chlorophyll), color = "black", linewidth = 0.7) +
-    geom_point(data = fc_yr3, aes(date, chlorophyll_forecast, color = branch), alpha = 0.6, size = 0.8) +
+    geom_point(data = fc_yr3, aes(date, chlorophyll_forecast, color = branch), alpha = 0.6, size = 1.2) +
     geom_hline(yintercept = bloom_threshold, linetype = "dashed", color = "red") +
-    scale_color_manual(values = c("Bloom forecast" = "#0072B2", "Calm forecast" = "#56B4E9"), name = NULL) +
+    scale_color_manual(values = c("Bloom forecast" = "#E69F00", "Calm forecast" = "#0072B2"), name = NULL) +
     coord_cartesian(xlim = c(yr_start, yr_end)) +
-    labs(x = NULL, y = "Chlorophyll (ug/L)", title = paste0(yr, ": 3-day-ahead points")) +
-    theme_bw(base_size = 11)
+    labs(x = NULL, y = "Chlorophyll (ug/L)") +
+    theme_bw(base_size = 16)
 
   list(overview = p_overview, lead3 = p_lead3)
 })
 
-panel_list <- unlist(lapply(year_panels, function(x) list(x$overview, x$lead3)), recursive = FALSE)
-wrap_plots(panel_list, ncol = 2, guides = "collect")
+label_plot <- function(text, angle = 0) {
+  ggplot() + theme_void() +
+    annotate("text", x = 0, y = 0, label = text, angle = angle, fontface = "bold", size = LABEL_SIZE)
+}
+
+patch_list <- c(
+  list(plot_spacer(), label_plot("Full trajectory"), label_plot("3-day-ahead")),
+  unlist(purrr::map2(years, year_panels, function(yr, p) {
+    list(label_plot(as.character(yr), angle = 90), p$overview, p$lead3)
+  }), recursive = FALSE)
+)
+n_rows <- length(years) + 1
+design <- purrr::map(seq_len(n_rows), function(r) {
+  list(area(t = r, l = 1, b = r, r = 1), area(t = r, l = 2, b = r, r = 2), area(t = r, l = 3, b = r, r = 3))
+}) %>% unlist(recursive = FALSE)
+
+wrap_plots(patch_list) +
+  plot_layout(design = reduce(design, c), widths = c(0.06, 1, 1),
+             heights = c(0.12, rep(1, length(years))), guides = "collect") &
+  theme(legend.text = element_text(size = 18), legend.title = element_text(size = 18))
 ```
 
 ## 3-day-ahead accuracy
 
 ```{r metrics_lead3}
 #| echo: false
+#| warning: false
 scored_lead3 <- scored %>% filter(lead_time == 3)
 
 metrics_overall_lead3 <- compute_metrics(scored_lead3$chlorophyll_forecast, scored_lead3$observed)
-kable(metrics_overall_lead3, digits = 3, caption = "Overall (3-day lead)")
+kable(metrics_overall_lead3 %>% select(n, rBias, rRMSE), digits = 3, caption = "Overall")
 
 metrics_by_year_lead3 <- scored_lead3 %>%
   group_by(year, branch) %>%
   group_modify(~ compute_metrics(.x$chlorophyll_forecast, .x$observed)) %>%
-  ungroup()
-kable(metrics_by_year_lead3, digits = 3, caption = "By year and branch (3-day lead)")
+  ungroup() %>%
+  mutate(branch = sub(" forecast$", "", branch))
+kable(metrics_by_year_lead3 %>% select(year, branch, n, rBias, rRMSE), digits = 3, caption = "By year and branch")
 ```
 
 ## Predicted vs observed
 
 ```{r scatter}
 #| echo: false
-#| fig.height: 9
+#| warning: false
+#| fig.width: 13
+#| fig.height: 10
+#| fig.align: center
+#| classes: pred-obs-figure
 scatter_data <- scored %>% filter(lead_time %in% c(1, 3, 5, 7))
 ggplot(scatter_data, aes(observed, chlorophyll_forecast, color = branch)) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "grey40") +
   geom_point(alpha = 0.35, size = 1.2) +
-  facet_wrap(~paste0("lead ", lead_time, "d")) +
-  scale_color_manual(values = c("Bloom forecast" = "#0072B2", "Calm forecast" = "#56B4E9"), name = NULL) +
+  facet_wrap(~paste0(lead_time, "-day ahead")) +
+  scale_color_manual(values = c("Bloom forecast" = "#E69F00", "Calm forecast" = "#0072B2"), name = NULL) +
   coord_equal() +
   labs(x = "Observed (ug/L)", y = "Forecast (ug/L)", title = "Predicted vs observed by lead time") +
-  theme_bw(base_size = 13)
+  theme_bw(base_size = 13) +
+  theme(legend.text = element_text(size = 16), legend.title = element_text(size = 16))
 ```
 
 ## Model fit quality (out-of-bag)
 
-Each model's out-of-bag accuracy on its own real, continuous training
-target (e.g. `remaining_peak` in ug/L), not a downstream trajectory
-artifact.
-
 ```{r oob}
 #| echo: false
+#| warning: false
 covs <- cfg$buoys[[buoy_id]]$covariate_combo
 if (length(covs) == 0) covs <- names(cfg$buoys[[buoy_id]]$covariates)
 
@@ -186,7 +218,7 @@ imp_calm_model <- train_calm_model(data, covs, bloom_threshold)
 oob_row <- function(fit, model_name, target_name) {
   if (is.null(fit)) return(NULL)
   tibble(model = model_name, target = target_name, n = fit$num.samples,
-        RMSE = sqrt(fit$prediction.error), OOB_R2 = fit$r.squared)
+        RMSE = sqrt(fit$prediction.error), R2 = fit$r.squared)
 }
 
 oob_table <- bind_rows(
@@ -194,5 +226,5 @@ oob_table <- bind_rows(
   oob_row(imp_bloom_models$duration_model, "Bloom: duration_model", "remaining_duration (days)"),
   oob_row(imp_bloom_models$decline_rate_model, "Bloom: decline_rate_model", "decline_rate (ug/L/day)")
 )
-kable(oob_table, digits = 3)
+kable(oob_table, digits = 3, caption = "Each model's out-of-bag accuracy against target")
 ```

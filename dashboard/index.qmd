@@ -287,6 +287,8 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     data_status_html, gap_warning_html, blank_line,
     main_content, blank_line,
     "<p class='csv-link'><a href='", csv_filename, "'>Click here to download raw forecasts</a></p>",
+    "<p class='model-note'>Predictions use recursive Random Forest models for water conditions ",
+    "and chl-a. See <a href='documentation.html'>Documentation</a> for more details.</p>",
     "</div>"
   )
 

@@ -53,7 +53,7 @@ format:
         }
         #quarto-document-content {
           grid-column: 1 / -1 !important;
-          max-width: 1600px !important;
+          max-width: 1400px !important;
           margin: 0 auto !important;
           width: 100% !important;
         }
@@ -75,7 +75,7 @@ format:
           display: block;
         }
         .pred-obs-figure img {
-          max-width: 1450px !important;
+          max-width: 1350px !important;
         }
         #title-block-header h1.title {
           font-size: 5rem !important;

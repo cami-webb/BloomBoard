@@ -333,12 +333,9 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
                  ymin = clim_low, ymax = clim_high, fill = "Typical range")) +
     geom_segment(aes(x = as.numeric(day_label) - 0.4, xend = as.numeric(day_label) + 0.4,
                      y = clim_mean, yend = clim_mean, linetype = "Seasonal average"), color = "grey40") +
-    geom_errorbar(aes(x = as.numeric(day_label), ymin = err_ymin, ymax = err_ymax,
-                     linetype = "Empirical error range"),
-                 width = 0.15, color = branch_color, alpha = 0.6, linewidth = 0.8) +
     geom_point(aes(y = chlorophyll_forecast, color = branch_label, text = hover), size = 4) +
     scale_fill_manual(values = c("Typical range" = "grey85"), name = NULL) +
-    scale_linetype_manual(values = c("Seasonal average" = "dashed", "Empirical error range" = "solid"), name = NULL) +
+    scale_linetype_manual(values = c("Seasonal average" = "dashed"), name = NULL) +
     scale_color_manual(values = setNames(branch_color, branch_label), name = NULL) +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
     clean_theme +
@@ -390,6 +387,27 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   # custom tick text under the hood, so a trace added post-conversion has to
   # match that numeric position to land on the same x as the existing points.
   p2_widget <- make_responsive(p2, height = 560)
+
+  # empirical error range as native plotly error bars, not geom_errorbar()
+  # -- ggplotly() doesn't correctly convert an asymmetric errorbar (ymin and
+  # ymax varying independently per row): it picks one boundary as the
+  # trace's own y position and applies a SYMMETRIC offset from there, which
+  # visibly detaches the bar from the real point and roughly doubles its
+  # height. Built natively here instead, with explicit asymmetric
+  # array/arrayminus centered on the actual chlorophyll_forecast value.
+  if (any(!is.na(week_df$err_ymin))) {
+    p2_widget <- p2_widget %>%
+      plotly::add_trace(
+        data = week_df, x = ~as.numeric(day_label), y = ~chlorophyll_forecast,
+        type = "scatter", mode = "markers", marker = list(opacity = 0, size = 1),
+        error_y = list(type = "data", symmetric = FALSE,
+                       array = week_df$err_ymax - week_df$chlorophyll_forecast,
+                       arrayminus = week_df$chlorophyll_forecast - week_df$err_ymin,
+                       color = branch_color, thickness = 2, width = 6),
+        name = "Empirical error range", hoverinfo = "skip", showlegend = TRUE
+      )
+  }
+
   if (!is.null(temp1_fc) && any(!is.na(week_df$temp_1m_forecast))) {
     p2_widget <- p2_widget %>%
       plotly::add_trace(

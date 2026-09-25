@@ -7,9 +7,9 @@ title: "Documentation"
 ```{mermaid}
 flowchart TD
     A["Today's chl-a observation +<br/>6 covariates:<br/>&bull; Water temperature (1m, 20m)<br/>&bull; Conductivity (1m, 20m)<br/>&bull; Salinity (20m)<br/>&bull; Air temperature"]
-    A --> Q{Is today's chlorophyll<br/>above 5 ug/L?}
+    A --> Q{"Is today's chlorophyll<br/>above 5 ug/L?"}
 
-    Q -->|Yes -- bloom in progress| BM["4 Random Forests trained only<br/>on past bloom events, using:<br/>&bull; Days since bloom started<br/>&bull; Rise rate so far<br/>&bull; Day of year<br/>&bull; Recent forecast surprise<br/>&bull; Each covariate's own 7-day trend<br/>&bull; Within-day chl-a volatility"]
+    Q -->|"Yes -- bloom in progress"| BM["4 Random Forests trained only<br/>on past bloom events, using:<br/>&bull; Days since bloom started<br/>&bull; Rise rate so far<br/>&bull; Day of year<br/>&bull; Recent forecast surprise<br/>&bull; Each covariate's own 7-day trend<br/>&bull; Within-day chl-a volatility"]
     BM --> BM1[Predict remaining peak magnitude]
     BM --> BM2[Predict remaining duration]
     BM --> BM4[Predict rise fraction]
@@ -20,9 +20,9 @@ flowchart TD
     BM3 --> TRAJ
     TRAJ --> OUT[7-day chlorophyll forecast]
 
-    Q -->|No -- calm| CFC[6 Random Forests predict each<br/>covariate daily up to 7 days ahead]
-    CFC --> CM[Random Forest predicts<br/>tomorrow's chl-a from today's<br/>value + 6 forecasted covariates]
-    CM -->|Repeat for each lead time (t)<br/>using forecasted chl-a for<br/>the previous day (t-1)| CM
+    Q -->|"No -- calm"| CFC["6 Random Forests predict each<br/>covariate daily up to 7 days ahead"]
+    CFC --> CM["Random Forest predicts<br/>tomorrow's chl-a from today's<br/>value + 6 forecasted covariates"]
+    CM -->|"Repeat for each lead time (t)<br/>using forecasted chl-a for<br/>the previous day (t-1)"| CM
     CM --> OUT
 ```
 

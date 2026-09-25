@@ -7370,9 +7370,9 @@ setTimeout(moveNavbarLogos, 1500);
 <div>
 <pre class="mermaid mermaid-js">flowchart TD
     A[&quot;Today&#39;s chl-a observation +&lt;br/&gt;6 covariates:&lt;br/&gt;&amp;bull; Water temperature (1m, 20m)&lt;br/&gt;&amp;bull; Conductivity (1m, 20m)&lt;br/&gt;&amp;bull; Salinity (20m)&lt;br/&gt;&amp;bull; Air temperature&quot;]
-    A --&gt; Q{Is today&#39;s chlorophyll&lt;br/&gt;above 5 ug/L?}
+    A --&gt; Q{&quot;Is today&#39;s chlorophyll&lt;br/&gt;above 5 ug/L?&quot;}
 
-    Q --&gt;|Yes -- bloom in progress| BM[&quot;4 Random Forests trained only&lt;br/&gt;on past bloom events, using:&lt;br/&gt;&amp;bull; Days since bloom started&lt;br/&gt;&amp;bull; Rise rate so far&lt;br/&gt;&amp;bull; Day of year&lt;br/&gt;&amp;bull; Recent forecast surprise&lt;br/&gt;&amp;bull; Each covariate&#39;s own 7-day trend&lt;br/&gt;&amp;bull; Within-day chl-a volatility&quot;]
+    Q --&gt;|&quot;Yes -- bloom in progress&quot;| BM[&quot;4 Random Forests trained only&lt;br/&gt;on past bloom events, using:&lt;br/&gt;&amp;bull; Days since bloom started&lt;br/&gt;&amp;bull; Rise rate so far&lt;br/&gt;&amp;bull; Day of year&lt;br/&gt;&amp;bull; Recent forecast surprise&lt;br/&gt;&amp;bull; Each covariate&#39;s own 7-day trend&lt;br/&gt;&amp;bull; Within-day chl-a volatility&quot;]
     BM --&gt; BM1[Predict remaining peak magnitude]
     BM --&gt; BM2[Predict remaining duration]
     BM --&gt; BM4[Predict rise fraction]
@@ -7383,9 +7383,9 @@ setTimeout(moveNavbarLogos, 1500);
     BM3 --&gt; TRAJ
     TRAJ --&gt; OUT[7-day chlorophyll forecast]
 
-    Q --&gt;|No -- calm| CFC[6 Random Forests predict each&lt;br/&gt;covariate daily up to 7 days ahead]
-    CFC --&gt; CM[Random Forest predicts&lt;br/&gt;tomorrow&#39;s chl-a from today&#39;s&lt;br/&gt;value + 6 forecasted covariates]
-    CM --&gt;|Repeat for each lead time (t)&lt;br/&gt;using forecasted chl-a for&lt;br/&gt;the previous day (t-1)| CM
+    Q --&gt;|&quot;No -- calm&quot;| CFC[&quot;6 Random Forests predict each&lt;br/&gt;covariate daily up to 7 days ahead&quot;]
+    CFC --&gt; CM[&quot;Random Forest predicts&lt;br/&gt;tomorrow&#39;s chl-a from today&#39;s&lt;br/&gt;value + 6 forecasted covariates&quot;]
+    CM --&gt;|&quot;Repeat for each lead time (t)&lt;br/&gt;using forecasted chl-a for&lt;br/&gt;the previous day (t-1)&quot;| CM
     CM --&gt; OUT
 </pre>
 </div>

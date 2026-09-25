@@ -13,14 +13,14 @@ flowchart TD
     BM --> BM1[Predict remaining peak magnitude]
     BM --> BM2[Predict remaining duration]
     BM --> BM3[Predict decline rate]
-    BM1 --> TRAJ["Build trajectory (arithmetic,<br/>not a model): rise to the<br/>predicted peak over the<br/>historical rise fraction of the<br/>predicted duration, then<br/>decline at the predicted rate"]
+    BM1 --> TRAJ["Build trajectory: rise to<br/>predicted peak at historical<br/>rise rate, then decline at<br/>predicted fall rate"]
     BM2 --> TRAJ
     BM3 --> TRAJ
     TRAJ --> OUT[7-day chlorophyll forecast]
 
     Q -->|No -- calm| CFC[6 Random Forests predict each<br/>covariate daily up to 7 days ahead]
     CFC --> CM[Random Forest predicts<br/>tomorrow's chl-a from today's<br/>value + 6 forecasted covariates]
-    CM -->|Repeat 7 times: each day's<br/>prediction becomes the next<br/>day's starting value| CM
+    CM -->|Repeat for each lead time (t)<br/>using forecasted chl-a for<br/>the previous day (t-1)| CM
     CM --> OUT
 ```
 

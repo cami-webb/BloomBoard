@@ -6,21 +6,21 @@ title: "Documentation"
 
 ```{mermaid}
 flowchart TD
-    A[Today's real chlorophyll +<br/>6 covariates: temp_1m, cond_1m,<br/>temp_20m, sal_20m, cond_20m, air_temp]
+    A["Today's chl-a observation +<br/>6 covariates:<br/>&bull; Water temperature (1m, 20m)<br/>&bull; Conductivity (1m, 20m)<br/>&bull; Salinity (20m)<br/>&bull; Air temperature"]
     A --> Q{Is today's chlorophyll<br/>above 5 ug/L?}
 
-    Q -->|Yes -- bloom in progress| BM[3 Random Forests trained only<br/>on past bloom events, using:<br/>days since bloom started, rise rate<br/>so far, day of year, recent forecast<br/>surprise, each covariate's own<br/>7-day trend, within-day chl-a volatility]
+    Q -->|Yes -- bloom in progress| BM["3 Random Forests trained only<br/>on past bloom events, using:<br/>&bull; Days since bloom started<br/>&bull; Rise rate so far<br/>&bull; Day of year<br/>&bull; Recent forecast surprise<br/>&bull; Each covariate's own 7-day trend<br/>&bull; Within-day chl-a volatility"]
     BM --> BM1[Predict remaining peak magnitude]
     BM --> BM2[Predict remaining duration]
     BM --> BM3[Predict decline rate]
-    BM1 --> TRAJ[Build trajectory:<br/>rise to predicted peak,<br/>then decline at predicted rate]
+    BM1 --> TRAJ["Build trajectory (arithmetic,<br/>not a model): rise to the<br/>predicted peak over the<br/>historical rise fraction of the<br/>predicted duration, then<br/>decline at the predicted rate"]
     BM2 --> TRAJ
     BM3 --> TRAJ
     TRAJ --> OUT[7-day chlorophyll forecast]
 
-    Q -->|No -- calm| CFC[6 per-covariate Random Forests<br/>forecast each covariate forward,<br/>one day at a time, 7 days ahead]
-    CFC --> CM[Calm-branch Random Forest:<br/>predicts tomorrow's chlorophyll<br/>from today's value + the 6<br/>forecasted covariates]
-    CM -->|Repeat using<br/>yesterday's prediction<br/>as today's state| CM
+    Q -->|No -- calm| CFC[6 Random Forests predict each<br/>covariate daily up to 7 days ahead]
+    CFC --> CM[Random Forest predicts<br/>tomorrow's chl-a from today's<br/>value + 6 forecasted covariates]
+    CM -->|Repeat 7 times: each day's<br/>prediction becomes the next<br/>day's starting value| CM
     CM --> OUT
 ```
 

@@ -224,6 +224,7 @@ oob_row <- function(fit, model_name, target_name) {
 oob_table <- bind_rows(
   oob_row(imp_bloom_models$peak_model, "Bloom: peak_model", "remaining_peak (ug/L)"),
   oob_row(imp_bloom_models$duration_model, "Bloom: duration_model", "remaining_duration (days)"),
+  oob_row(imp_bloom_models$rise_fraction_model, "Bloom: rise_fraction_model", "rise_fraction (unitless)"),
   oob_row(imp_bloom_models$decline_rate_model, "Bloom: decline_rate_model", "decline_rate (ug/L/day)")
 )
 kable(oob_table, digits = 3, caption = "Each model's out-of-bag accuracy against target")

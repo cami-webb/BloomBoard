@@ -5,16 +5,18 @@ library(ranger)
 library(dplyr)
 library(lubridate)
 
-# Predict this upper quantile (not the mean) of peak/duration/decline on bloom days (there was meaningful underestimation when
+# Predict this upper quantile (not the mean) of peak/duration/rise/decline on bloom days (there was meaningful underestimation when
 # predicting the mean and a 0.7 quantile produced the best results)
 bloom_peak_quantile <- 0.7
 bloom_duration_quantile <- 0.7
+bloom_rise_quantile <- 0.7
 bloom_decline_quantile <- 0.7
 
 # Fixed bloom threshold (µg/L); a dynamic mean classified calm days as blooms
 compute_bloom_threshold <- function(data) 5
 
-# Empirical median fraction of an event's duration from start to peak
+# Empirical median fraction of an event's duration from start to peak --
+# fallback for when rise_fraction_model can't be fit (too few bloom events)
 compute_bloom_rise_fraction <- function(data, threshold) {
   d <- data[order(data$date), ]
   is_bloom <- !is.na(d$chlorophyll) & d$chlorophyll > threshold
@@ -99,6 +101,13 @@ compute_bloom_training_panel <- function(data, covs, threshold) {
     rep((vals[n] - vals[peak_idx]) / (n - peak_idx), n)
   })
 
+  # this event's own fraction of total duration spent rising to peak
+  bloom_rows$rise_fraction <- ave(bloom_rows$chlorophyll, bloom_event_id, FUN = function(vals) {
+    peak_idx <- which.max(vals)
+    n <- length(vals)
+    rep(peak_idx / n, n)
+  })
+
   dts_full <- d$date
   for (cov_name in covs) {
     val_full <- d[[cov_name]]
@@ -110,7 +119,7 @@ compute_bloom_training_panel <- function(data, covs, threshold) {
   bloom_rows
 }
 
-# Trains the three bloom outcome models (peak magnitude, remaining duration, decline rate) on bloom-only data)
+# Trains the four bloom outcome models (peak magnitude, remaining duration, decline rate, rise fraction) on bloom-only data)
 train_bloom_models <- function(data, covs, bloom_threshold, importance = "none") {
   panel <- compute_bloom_training_panel(data, covs, bloom_threshold)
   trend_cols <- paste0(covs, "_trend7")
@@ -132,10 +141,14 @@ train_bloom_models <- function(data, covs, bloom_threshold, importance = "none")
   d <- d[stats::complete.cases(d), ]
   if (nrow(d) < 10) return(NULL)
 
-  # filtered separately so NA decline_rate rows don't also shrink peak_model/duration_model's training data
+  # filtered separately so NA decline_rate/rise_fraction rows don't also shrink peak_model/duration_model's training data
   d_decline <- base_d
   d_decline$decline_rate <- panel$decline_rate
   d_decline <- d_decline[stats::complete.cases(d_decline), ]
+
+  d_rise <- base_d
+  d_rise$rise_fraction <- panel$rise_fraction
+  d_rise <- d_rise[stats::complete.cases(d_rise), ]
 
   form_rhs <- paste0("`", predictor_cols, "`", collapse = " + ")
   # fixed seed (ranger's bootstrap sampling is random otherwise)
@@ -150,14 +163,21 @@ train_bloom_models <- function(data, covs, bloom_threshold, importance = "none")
                    num.trees = 200, min.node.size = 5, num.threads = 1, quantreg = TRUE,
                    importance = importance, seed = 42)
   } else NULL
+  rise_fraction_model <- if (nrow(d_rise) >= 10) {
+    ranger::ranger(as.formula(paste("rise_fraction ~", form_rhs)), data = d_rise,
+                   num.trees = 200, min.node.size = 5, num.threads = 1, quantreg = TRUE,
+                   importance = importance, seed = 42)
+  } else NULL
 
   # attached for diagnostic use (e.g. rRMSE) see README
   attr(peak_model, "target_mean") <- mean(d$remaining_peak)
   attr(duration_model, "target_mean") <- mean(d$remaining_duration)
   if (!is.null(decline_rate_model)) attr(decline_rate_model, "target_mean") <- mean(d_decline$decline_rate)
+  if (!is.null(rise_fraction_model)) attr(rise_fraction_model, "target_mean") <- mean(d_rise$rise_fraction)
 
   list(peak_model = peak_model, duration_model = duration_model,
-      decline_rate_model = decline_rate_model, predictor_cols = predictor_cols)
+      decline_rate_model = decline_rate_model, rise_fraction_model = rise_fraction_model,
+      predictor_cols = predictor_cols)
 }
 
 # ref_date's day-index within its bloom event (1 = onset day) and the chlorophyll value on onset day
@@ -175,7 +195,8 @@ find_bloom_onset_info <- function(data, ref_date, threshold) {
   list(days_since_onset = count, onset_value = data$chlorophyll[data$date == onset_date][1])
 }
 
-# Bloom-day forecast: predicts peak magnitude and remaining duration directly, then builds the trajectory from those two numbers
+# Bloom-day forecast: predicts peak magnitude, remaining duration, rise fraction, and decline
+# rate directly, then builds the trajectory from those numbers
 forecast_bloom <- function(train_data, ref_row, covs, ref_date, horizon, bloom_threshold) {
   models <- train_bloom_models(train_data, covs, bloom_threshold)
   if (is.null(models)) {
@@ -225,9 +246,19 @@ forecast_bloom <- function(train_data, ref_row, covs, ref_date, horizon, bloom_t
                                quantiles = bloom_duration_quantile)$predictions[, 1]
   pred_remaining_duration <- max(1, round(pred_duration_raw))
 
-  # Build the trajectory from the two predicted numbers:
-    # rise to pred_peak over the empirical rise fraction, then decline at decline_rate with no forced endpoint
-  rise_fraction <- compute_bloom_rise_fraction(train_data, bloom_threshold)
+  # Build the trajectory from the predicted numbers:
+    # rise to pred_peak over the predicted rise fraction, then decline at the predicted decline_rate with no forced endpoint
+  rise_fraction <- if (!is.null(models$rise_fraction_model)) {
+    predict(models$rise_fraction_model, data = newdata, type = "quantiles",
+           quantiles = bloom_rise_quantile)$predictions[, 1]
+  } else {
+    compute_bloom_rise_fraction(train_data, bloom_threshold)
+  }
+  # a predicted fraction is a free regression output, not naturally bounded to
+  # (0, 1) the way the empirical fallback is -- clamp so the trajectory always
+  # has both a real rise and decline phase
+  if (is.na(rise_fraction)) rise_fraction <- compute_bloom_rise_fraction(train_data, bloom_threshold)
+  rise_fraction <- min(max(rise_fraction, 0.05), 0.95)
   # collapse rise phase to 0 if there's little predicted rise left (avoids a flat plateau before the decline)
   rise_gap <- pred_peak - current_state
   rise_days <- if (rise_gap <= 0.2) 0 else max(1, round(pred_remaining_duration * rise_fraction))

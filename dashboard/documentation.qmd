@@ -9,12 +9,14 @@ flowchart TD
     A["Today's chl-a observation +<br/>6 covariates:<br/>&bull; Water temperature (1m, 20m)<br/>&bull; Conductivity (1m, 20m)<br/>&bull; Salinity (20m)<br/>&bull; Air temperature"]
     A --> Q{Is today's chlorophyll<br/>above 5 ug/L?}
 
-    Q -->|Yes -- bloom in progress| BM["3 Random Forests trained only<br/>on past bloom events, using:<br/>&bull; Days since bloom started<br/>&bull; Rise rate so far<br/>&bull; Day of year<br/>&bull; Recent forecast surprise<br/>&bull; Each covariate's own 7-day trend<br/>&bull; Within-day chl-a volatility"]
+    Q -->|Yes -- bloom in progress| BM["4 Random Forests trained only<br/>on past bloom events, using:<br/>&bull; Days since bloom started<br/>&bull; Rise rate so far<br/>&bull; Day of year<br/>&bull; Recent forecast surprise<br/>&bull; Each covariate's own 7-day trend<br/>&bull; Within-day chl-a volatility"]
     BM --> BM1[Predict remaining peak magnitude]
     BM --> BM2[Predict remaining duration]
+    BM --> BM4[Predict rise fraction]
     BM --> BM3[Predict decline rate]
-    BM1 --> TRAJ["Build trajectory: rise to<br/>predicted peak at historical<br/>rise rate, then decline at<br/>predicted fall rate"]
+    BM1 --> TRAJ["Build trajectory: rise to<br/>predicted peak at predicted<br/>rise rate, then decline at<br/>predicted fall rate"]
     BM2 --> TRAJ
+    BM4 --> TRAJ
     BM3 --> TRAJ
     TRAJ --> OUT[7-day chlorophyll forecast]
 
@@ -30,13 +32,14 @@ growing observation record and each day's forecast output. Which
 chlorophyll model runs depends on whether today's real chlorophyll is
 currently above or below the bloom threshold (5 ug/L):
 
-- **Bloom day**: three Random Forests, trained only on past bloom
+- **Bloom day**: four Random Forests, trained only on past bloom
   events, each predict one property of how the current bloom will
   play out -- how high it will still peak, how many more days it
-  will last, and how fast it will decline afterward. These use
-  today's real covariate readings and each covariate's own 7-day
-  trend directly, not a multi-day forecast of them, since the whole
-  trajectory is predicted in one shot rather than day by day.
+  will last, what fraction of that remaining time will be spent
+  still rising, and how fast it will decline once it peaks. These
+  use today's real covariate readings and each covariate's own
+  7-day trend directly, not a multi-day forecast of them, since the
+  whole trajectory is predicted in one shot rather than day by day.
 - **Calm day**: the 6 covariates are first forecast forward a day at
   a time (their own simple Random Forests, today's value + day of
   year predicting tomorrow's value), since a calm-day forecast

@@ -243,8 +243,8 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   # can sit between the title and the chart itself, matching the Buoy
   # Location section's layout
   p_caption <- paste0("<p class='section-caption'>Chl-a trends over the last 30 days + ",
-                      "7-day forecast with the empirical error range -- this site's own ",
-                      "historical forecast error for that lead time -- shown relative to the ",
+                      "7-day forecast with the empirical error range (this site's own ",
+                      "historical forecast error for that lead time) shown relative to the ",
                       "1-day-lead forecast. Hover over points for details.</p>")
 
   # blank spacer line -- an empty <p> renders as visible vertical space
@@ -477,8 +477,8 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
 
   p_annual_caption <- paste0("<p class='section-caption'>Chl-a trends year-to-date (",
                              format(year_start, "%b %d"), " to present) + 7-day forecast with ",
-                             "the empirical error range -- this site's own historical forecast ",
-                             "error for that lead time -- shown relative to the 1-day-lead ",
+                             "the empirical error range (this site's own historical forecast ",
+                             "error for that lead time) shown relative to the 1-day-lead ",
                              "forecast. Hover over points for details.</p>")
 
   p_annual_widget <- make_responsive(p_annual)

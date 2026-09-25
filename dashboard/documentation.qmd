@@ -2,4 +2,39 @@
 title: "Documentation"
 ---
 
-Coming soon.
+## Forecast pipeline
+
+```{mermaid}
+flowchart TD
+    A[Daily buoy observations\n+ water covariates] --> B{Today's state:\nBloom or Calm?}
+    A --> C[Per-covariate Random Forests\ntemp, salinity, conductivity, air temp]
+    C --> D[Recursive covariate forecast\n7 days ahead]
+
+    B -->|Bloom| E[Bloom-branch Random Forests\npeak magnitude, duration, decline rate]
+    B -->|Calm| F[Calm-branch Random Forest\nday-to-day change]
+
+    D --> E
+    D --> F
+
+    E --> G[Build trajectory:\nrise to predicted peak,\nthen decline]
+    F --> H[Recursive day-by-day\nchlorophyll forecast]
+
+    G --> I[7-day chlorophyll forecast]
+    H --> I
+```
+
+Every model here is retrained from scratch each day on all historical
+data up to that point -- nothing is persisted between days except the
+growing observation record and each day's forecast output. Water
+conditions (temperature, salinity, conductivity, air temperature) are
+forecast forward first, since the chlorophyll models need them as
+inputs beyond today. Which chlorophyll model runs depends on whether
+today's chlorophyll is currently above or below the bloom threshold:
+a bloom in progress uses three Random Forests trained only on
+historical bloom events, each predicting one property of how the
+bloom will play out (how high it will peak, how many more days it
+will last, and how fast it will decline afterward); a calm day
+instead uses a single Random Forest that recursively predicts each
+day's change from the day before.
+
+Coming soon: covariate details, data sources, and validation methodology.

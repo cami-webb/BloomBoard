@@ -228,14 +228,14 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
 
   p <- ggplot(ts_combined, aes(date, value, color = series, group = series, text = hover)) +
     geom_ribbon(data = fc_uncertainty, aes(date, ymin = ymin, ymax = ymax,
-                                           fill = "Forecast uncertainty"),
+                                           fill = "Empirical error range"),
                inherit.aes = FALSE, alpha = 0.3) +
     geom_line(data = full_clim, aes(date, clim_mean, linetype = "Seasonal average"),
              inherit.aes = FALSE, color = "grey40") +
     geom_line(linewidth = 0.6) +
     geom_hline(aes(yintercept = bloom_threshold, linetype = "Bloom threshold"), color = "red") +
     scale_color_manual(values = setNames(c("black", branch_color), c("Observed", branch_label)), name = NULL) +
-    scale_fill_manual(values = c("Forecast uncertainty" = branch_color), name = NULL) +
+    scale_fill_manual(values = c("Empirical error range" = branch_color), name = NULL) +
     scale_linetype_manual(values = c("Bloom threshold" = "dashed", "Seasonal average" = "dashed"), name = NULL) +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
     clean_theme
@@ -243,7 +243,8 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   # can sit between the title and the chart itself, matching the Buoy
   # Location section's layout
   p_caption <- paste0("<p class='section-caption'>Chl-a trends over the last 30 days + ",
-                      "7-day forecast with empirical uncertainty shown relative to the ",
+                      "7-day forecast with the empirical error range -- this site's own ",
+                      "historical forecast error for that lead time -- shown relative to the ",
                       "1-day-lead forecast. Hover over points for details.</p>")
 
   # blank spacer line -- an empty <p> renders as visible vertical space
@@ -311,12 +312,16 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     rowwise() %>%
     mutate(doy_climatology(data, date)) %>%
     ungroup() %>%
+    left_join(fc_uncertainty %>% select(date, err_ymin = ymin, err_ymax = ymax), by = "date") %>%
     mutate(deviation = chlorophyll_forecast - clim_mean,
           day_label = paste0(format(date, "%a"), "\n", format(date, "%b %d")),
           day_label = factor(day_label, levels = day_label),
           hover = paste0(format(date, "%a, %b %d"), "<br>Forecast: ", round(chlorophyll_forecast, 1),
                         " ug/L<br>", sprintf("%+.1f", deviation), " ug/L vs seasonal normal",
-                        "<br>Typical range: ", round(clim_low, 1), "-", round(clim_high, 1), " ug/L"))
+                        "<br>Typical range: ", round(clim_low, 1), "-", round(clim_high, 1), " ug/L",
+                        ifelse(!is.na(err_ymin),
+                               paste0("<br>Empirical error range: ", round(err_ymin, 1), "-",
+                                     round(err_ymax, 1), " ug/L"), "")))
   if (!is.null(temp1_fc)) {
     week_df <- week_df %>% left_join(temp1_fc, by = "date")
   } else {
@@ -328,9 +333,12 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
                  ymin = clim_low, ymax = clim_high, fill = "Typical range")) +
     geom_segment(aes(x = as.numeric(day_label) - 0.4, xend = as.numeric(day_label) + 0.4,
                      y = clim_mean, yend = clim_mean, linetype = "Seasonal average"), color = "grey40") +
+    geom_errorbar(aes(x = as.numeric(day_label), ymin = err_ymin, ymax = err_ymax,
+                     linetype = "Empirical error range"),
+                 width = 0.15, color = branch_color, alpha = 0.6, linewidth = 0.8) +
     geom_point(aes(y = chlorophyll_forecast, color = branch_label, text = hover), size = 4) +
     scale_fill_manual(values = c("Typical range" = "grey85"), name = NULL) +
-    scale_linetype_manual(values = c("Seasonal average" = "dashed"), name = NULL) +
+    scale_linetype_manual(values = c("Seasonal average" = "dashed", "Empirical error range" = "solid"), name = NULL) +
     scale_color_manual(values = setNames(branch_color, branch_label), name = NULL) +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
     clean_theme +
@@ -343,7 +351,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   # legend seven times -- keep only the first occurrence of each name.
   # The typical-range/seasonal-average traces also get their hover turned
   # off entirely, so only the forecast point responds to hover.
-  no_hover <- c("Typical range", "Seasonal average", "Forecast uncertainty")
+  no_hover <- c("Typical range", "Seasonal average", "Empirical error range")
   no_legend <- character(0)
   polish_traces <- function(p_ly) {
     seen <- character(0)
@@ -414,7 +422,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   # draw/stacking order (the ribbon needs to stay drawn under the line), so
   # reordering it to fix the legend would change the visual layering too.
   p_widget <- make_responsive(p)
-  legend_rank <- setNames(1:5, c("Observed", branch_label, "Forecast uncertainty",
+  legend_rank <- setNames(1:5, c("Observed", branch_label, "Empirical error range",
                                  "Seasonal average", "Bloom threshold"))
   p_widget$x$data <- lapply(p_widget$x$data, function(tr) {
     if (!is.null(tr$name) && tr$name %in% names(legend_rank)) {
@@ -454,14 +462,14 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
 
   p_annual <- ggplot(annual_ts_combined, aes(date, value, color = series, group = series, text = hover)) +
     geom_ribbon(data = fc_uncertainty, aes(date, ymin = ymin, ymax = ymax,
-                                           fill = "Forecast uncertainty"),
+                                           fill = "Empirical error range"),
                inherit.aes = FALSE, alpha = 0.3) +
     geom_line(data = annual_full_clim, aes(date, clim_mean, linetype = "Seasonal average"),
              inherit.aes = FALSE, color = "grey40") +
     geom_line(linewidth = 0.6) +
     geom_hline(aes(yintercept = bloom_threshold, linetype = "Bloom threshold"), color = "red") +
     scale_color_manual(values = setNames(c("black", branch_color), c("Observed", branch_label)), name = NULL) +
-    scale_fill_manual(values = c("Forecast uncertainty" = branch_color), name = NULL) +
+    scale_fill_manual(values = c("Empirical error range" = branch_color), name = NULL) +
     scale_linetype_manual(values = c("Bloom threshold" = "dashed", "Seasonal average" = "dashed"), name = NULL) +
     scale_x_date(date_breaks = "1 month", date_labels = "%b") +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
@@ -469,8 +477,9 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
 
   p_annual_caption <- paste0("<p class='section-caption'>Chl-a trends year-to-date (",
                              format(year_start, "%b %d"), " to present) + 7-day forecast with ",
-                             "empirical uncertainty shown relative to the 1-day-lead forecast. ",
-                             "Hover over points for details.</p>")
+                             "the empirical error range -- this site's own historical forecast ",
+                             "error for that lead time -- shown relative to the 1-day-lead ",
+                             "forecast. Hover over points for details.</p>")
 
   p_annual_widget <- make_responsive(p_annual)
   p_annual_widget$x$data <- lapply(p_annual_widget$x$data, function(tr) {

@@ -34,14 +34,13 @@ bloom is in its life cycle:
   peak.
 - **Day of year**: captures seasonality, so a spring bloom is
   treated differently from a summer or fall one.
-- **Recent forecast error**: how far off today's actual chlorophyll
-  is from a simple trend-continuation guess (not the model's own
-  prediction), which is a quick proxy for how volatile conditions
-  are right now.
+- **Recent forecast error**: how far off today's observed
+  chlorophyll is from a simple "yesterday's trend continues" guess,
+  as a measure of current volatility.
 - **Each covariate's 7-day trend**: today's water/air condition
   minus its value a week ago, so the model knows whether conditions
   are warming, cooling, etc., not just their current level.
-- **Within-day chlorophyll volatility**: how much chlorophyll swung
+- **Hourly chlorophyll volatility**: how much chlorophyll swung
   up and down within a single day's hourly sensor readings (its
   standard deviation, high-low range, and trend), capturing
   short-term noise that a single daily average would miss.
@@ -56,7 +55,7 @@ flowchart TD
     A["Today's chl-a observation + 6 covariates:<br/>&bull; Water temp (1m, 20m)<br/>&bull; Conductivity (1m, 20m)<br/>&bull; Salinity (20m)<br/>&bull; Air temperature"]
     A --> Q(("Is today's chlorophyll above 5 ug/L?"))
 
-    Q -->|"Yes -- bloom in progress"| BM["4 Random Forests trained on past blooms:<br/>&bull; Days since bloom started<br/>&bull; Rise rate so far<br/>&bull; Day of year<br/>&bull; Recent forecast error<br/>&bull; Each covariate's own 7-day trend<br/>&bull; Within-day chl-a volatility"]
+    Q -->|"Yes -- bloom in progress"| BM["4 Random Forests trained on past blooms:<br/>&bull; Days since bloom started<br/>&bull; Rise rate so far<br/>&bull; Day of year<br/>&bull; Recent forecast error<br/>&bull; Each covariate's own 7-day trend<br/>&bull; Hourly chl-a volatility"]
     BM --> BM1[Predict remaining peak magnitude]
     BM --> BM2[Predict remaining duration]
     BM --> BM4[Predict rise fraction]

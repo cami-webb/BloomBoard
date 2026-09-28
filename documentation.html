@@ -7521,15 +7521,16 @@ flowchart TD
 <section id="development" class="level2">
 <h2 data-anchor-id="development">Development</h2>
 <div style="max-width: 900px; margin: 0 auto; font-size: 19px;">
-<p>Random Forest wasn’t the first model type tried. Earlier development (in this project’s predecessor repo) screened four model types against each other:</p>
+<p>Random Forest wasn’t the only model type tried. Earlier development screened four model types against each other:</p>
 <ul>
-<li><strong>ARIMA</strong>: a classic time-series model using only chlorophyll’s own past values, with no water/air covariates. A simple, useful benchmark, but it can’t take advantage of buoy conditions.</li>
+<li><strong>ARIMA</strong>: a classic time-series model using only chlorophyll’s own past values, with no water/air covariates. A simple, useful benchmark, but it can’t take advantage of any buoy observations</li>
 <li><strong>XGBoost</strong>: a gradient-boosted tree ensemble, conceptually similar to Random Forest but builds trees sequentially, each correcting the last one’s errors.</li>
 <li><strong>Dynamic GAM (dGAM)</strong>: a generalized additive model that captures smooth, nonlinear relationships between covariates and chlorophyll.</li>
 <li><strong>Random Forest</strong>: an ensemble of many independent decision trees, each trained on a random subset of the data and covariates, then averaged together.</li>
 </ul>
-<p>Rather than guessing which covariates mattered, every combination of model type and covariate subset (drawing from the full pool of buoy and weather-forecast covariates, up to 5 at a time) was cross-validated against each other – about 237,000 model/covariate combinations in total. Random Forest came out with the lowest cross-validated error by a wide margin: RMSE of about 0.27, compared to roughly 0.30 for XGBoost, 0.38 for dGAM, and 0.77 for the plain ARIMA baseline. That search is why Random Forest is the model type used throughout BloomBoard today.</p>
-<p>The same search is also how the covariates were chosen: water temperature, conductivity, salinity, and air temperature – the six covariates in the table at the top of this page – consistently ranked among the best-performing combinations, while other candidates that were tried, like mixed-layer depth and current speed, didn’t make the cut. (That cross-validation used randomly shuffled folds rather than realistic day-by-day forecasting, so these numbers are a best-case comparison – the winning Random Forest approach was then re-checked against realistic rolling forecasts before being adopted for production.)</p>
+<p>Rather than guessing which covariates mattered, every combination of model type and covariate subset (drawing from the full pool of buoy and weather-forecast covariates) was cross-validated against each other (about 237,000 model/covariate combinations in total). Random Forest came out with the lowest cross-validated error by a wide margin: RMSE of about 0.27, compared to roughly 0.30 for XGBoost, 0.38 for dGAM, and 0.77 for the plain ARIMA baseline.</p>
+<p>The same search is also how the covariates were chosen: water temperature, conductivity, salinity, and air temperature consistently ranked among the best-performing combinations, while other candidates that were tried, like mixed-layer depth and current speed, didn’t make the cut. This was validated by a few full test runs with these covariates to confirm that there was no missing signal from other unincluded covariates.</p>
+<p>For more details, see full Documentation in the BloomBoard GitHub (https://github.com/cami-webb/BloomBoard)</p>
 </div>
 
 

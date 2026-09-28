@@ -169,11 +169,22 @@ train_bloom_models <- function(data, covs, bloom_threshold, importance = "none")
                    importance = importance, seed = 42)
   } else NULL
 
-  # attached for diagnostic use (e.g. rRMSE) see README
+  # attached for diagnostic use (e.g. rRMSE, rBias) see README. oob_bias is
+  # the mean signed OOB residual (ranger keeps OOB predictions in
+  # fit$predictions but not the true targets, so this has to be computed
+  # here while both are still in scope)
   attr(peak_model, "target_mean") <- mean(d$remaining_peak)
+  attr(peak_model, "oob_bias") <- mean(peak_model$predictions - d$remaining_peak, na.rm = TRUE)
   attr(duration_model, "target_mean") <- mean(d$remaining_duration)
-  if (!is.null(decline_rate_model)) attr(decline_rate_model, "target_mean") <- mean(d_decline$decline_rate)
-  if (!is.null(rise_fraction_model)) attr(rise_fraction_model, "target_mean") <- mean(d_rise$rise_fraction)
+  attr(duration_model, "oob_bias") <- mean(duration_model$predictions - d$remaining_duration, na.rm = TRUE)
+  if (!is.null(decline_rate_model)) {
+    attr(decline_rate_model, "target_mean") <- mean(d_decline$decline_rate)
+    attr(decline_rate_model, "oob_bias") <- mean(decline_rate_model$predictions - d_decline$decline_rate, na.rm = TRUE)
+  }
+  if (!is.null(rise_fraction_model)) {
+    attr(rise_fraction_model, "target_mean") <- mean(d_rise$rise_fraction)
+    attr(rise_fraction_model, "oob_bias") <- mean(rise_fraction_model$predictions - d_rise$rise_fraction, na.rm = TRUE)
+  }
 
   list(peak_model = peak_model, duration_model = duration_model,
       decline_rate_model = decline_rate_model, rise_fraction_model = rise_fraction_model,

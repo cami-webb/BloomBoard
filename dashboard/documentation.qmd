@@ -2,6 +2,21 @@
 title: "Documentation"
 ---
 
+## Covariates
+
+The six buoy-measured water/air conditions used by the forecast
+models, all sourced from A01's own sensors (no external weather
+forecast data is used):
+
+| Covariate  | Description         | Sensor | Depth        | Units |
+|------------|----------------------|--------|--------------|-------|
+| temp_1m    | Water temperature    | sbe37  | 1m           | °C    |
+| cond_1m    | Conductivity         | sbe37  | 1m           | mS/cm |
+| temp_20m   | Water temperature    | sbe37  | 20m          | °C    |
+| sal_20m    | Salinity             | sbe37  | 20m          | psu   |
+| cond_20m   | Conductivity         | sbe37  | 20m          | mS/cm |
+| air_temp   | Air temperature      | met    | -3m (above surface) | °C |
+
 ## Forecast pipeline
 
 ::: {style="max-width: 720px; margin: 0 auto 3rem auto; overflow: hidden;"}

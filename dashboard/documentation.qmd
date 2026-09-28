@@ -114,8 +114,8 @@ Rather than guessing which covariates mattered, every combination of
 model type and covariate subset (drawing from the full pool of buoy
 and weather-forecast covariates) was cross-validated
 against each other (about 237,000 model/covariate combinations in
-total). Random Forest came out with the lowest cross-validated error by
-a wide margin: RMSE of about 0.27, compared to roughly 0.30 for
+total). Random Forest came out with the lowest cross-validated error: 
+RMSE of about 0.27, compared to roughly 0.30 for
 XGBoost, 0.38 for dGAM, and 0.77 for the plain ARIMA baseline.
 
 The same search is also how the covariates were chosen: water

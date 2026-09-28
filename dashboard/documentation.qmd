@@ -28,6 +28,7 @@ flowchart TD
 ```
 :::
 
+::: {style="max-width: 700px; margin: 0 auto;"}
 Each model is retrained from scratch each day on all historical data
 up to that point. Which chlorophyll model runs depends on whether
 today's real chlorophyll is currently above or below the bloom
@@ -46,3 +47,4 @@ threshold (5 ug/L):
   using that day's forecasted covariates.
 
 Coming soon: covariate details, data sources, and validation methodology.
+:::

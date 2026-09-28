@@ -4,6 +4,7 @@ title: "Documentation"
 
 ## Forecast pipeline
 
+::: {style="max-width: 320px; margin: 0 auto; overflow: hidden;"}
 ```{mermaid}
 flowchart TD
     A["Today's chl-a observation +<br/>6 covariates:<br/>&bull; Water temperature (1m, 20m)<br/>&bull; Conductivity (1m, 20m)<br/>&bull; Salinity (20m)<br/>&bull; Air temperature"]
@@ -25,6 +26,7 @@ flowchart TD
     CM -->|"Repeat for each lead time (t)<br/>using forecasted chl-a for<br/>the previous day (t-1)"| CM
     CM --> OUT
 ```
+:::
 
 Every model here is retrained from scratch each day on all historical
 data up to that point -- nothing is persisted between days except the

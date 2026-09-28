@@ -11,10 +11,10 @@ models, all sourced from A01's sensors:
 | Covariate  | Description         | Sensor | Depth        | Units |
 |------------|----------------------|--------|--------------|-------|
 | temp_1m    | Water temperature    | sbe37  | 1m           | °C    |
-| cond_1m    | Conductivity         | sbe37  | 1m           | mS/cm |
 | temp_20m   | Water temperature    | sbe37  | 20m          | °C    |
-| sal_20m    | Salinity             | sbe37  | 20m          | psu   |
+| cond_1m    | Conductivity         | sbe37  | 1m           | mS/cm |
 | cond_20m   | Conductivity         | sbe37  | 20m          | mS/cm |
+| sal_20m    | Salinity             | sbe37  | 20m          | psu   |
 | air_temp   | Air temperature      | met    | -3m (above surface) | °C |
 :::
 

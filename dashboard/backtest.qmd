@@ -99,7 +99,7 @@ Each row is one year. Full trajectory: every forecast's lead 1-5 days.
 ```{r panel_plot}
 #| echo: false
 #| warning: false
-#| fig.width: 18.5
+#| fig.width: 22.2
 #| fig.height: 22
 #| fig.align: center
 #| classes: year-panel-figure
@@ -184,7 +184,11 @@ metrics_by_year_lead3 <- scored_lead3 %>%
 kable(metrics_by_year_lead3 %>% select(year, branch, n, rBias, rRMSE), digits = 3, caption = "By year and branch")
 ```
 
-## Predicted vs observed
+## Predicted vs observed by lead time
+
+::: {.section-caption}
+Note: accuracy degrades with increasing lead time.
+:::
 
 ```{r scatter}
 #| echo: false
@@ -196,7 +200,7 @@ kable(metrics_by_year_lead3 %>% select(year, branch, n, rBias, rRMSE), digits = 
 # individual panels via patchwork instead of facet_wrap, so each panel's
 # title matches the year-overview panel's font/size instead of the default
 # grey facet strip bar
-scatter_data <- scored %>% filter(lead_time %in% c(1, 3, 5, 7))
+scatter_data <- scored %>% filter(lead_time %in% c(1, 3, 5, 7), chlorophyll_forecast > 0)
 scatter_plots <- purrr::map(c(1, 3, 5, 7), function(lt) {
   d <- scatter_data %>% filter(lead_time == lt)
   ggplot(d, aes(observed, chlorophyll_forecast, color = branch)) +
@@ -210,9 +214,7 @@ scatter_plots <- purrr::map(c(1, 3, 5, 7), function(lt) {
          legend.text = element_text(size = 16), legend.title = element_text(size = 16))
 })
 
-wrap_plots(scatter_plots, ncol = 2, guides = "collect") +
-  plot_annotation(title = "Predicted vs observed by lead time",
-                  theme = theme(plot.title = element_text(face = "bold", size = 22)))
+wrap_plots(scatter_plots, ncol = 2, guides = "collect")
 ```
 
 ## Model fit quality (out-of-bag)

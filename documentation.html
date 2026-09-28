@@ -7501,7 +7501,7 @@ flowchart TD
 </div>
 </div>
 <div style="max-width: 900px; margin: 0 auto; font-size: 19px;">
-<p>Each model is retrained from scratch each day on all historical data up to that point. Which chlorophyll model runs depends on whether today’s real chlorophyll is currently above or below the bloom threshold (5 ug/L):</p>
+<p>Each model is retrained from scratch each day on all historical data up to that point. Which chlorophyll model runs depends on whether today’s observed chlorophyll is currently above or below the bloom threshold (5 ug/L):</p>
 <ul>
 <li><strong>Bloom day</strong>: four Random Forests, trained on past bloom events, each predict one property of how the current bloom will play out: how high it will peak, how many more days it will last, what fraction of that remaining time will be spent still rising, and how fast it will decline once it peaks. These use today’s buoy covariate readings and each covariate’s own 7-day trend.</li>
 <li><strong>Calm day</strong>: the 6 covariates are first forecast forward a day at a time (by their own Random Forests, using today’s value + DOY to predict tomorrow’s value). A Random Forest then recursively predicts each day’s change in chlorophyll from the day before, using that day’s forecasted covariates.</li>

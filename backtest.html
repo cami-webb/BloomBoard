@@ -4066,11 +4066,11 @@ width/height attributes), so this has to target the svg itself
 with !important to actually shrink it, not just the wrapping
 <pre class="mermaid">. */
 pre.mermaid, .mermaid {
-  max-width: 720px !important;
+  max-width: 800px !important;
   margin: 0 auto !important;
 }
 .mermaid svg {
-  max-width: 720px !important;
+  max-width: 800px !important;
   width: 100% !important;
   height: auto !important;
 }
@@ -4161,6 +4161,9 @@ pre.mermaid, .mermaid {
   width: 720px !important;
   table-layout: fixed;
   margin: 0 auto 1.5rem auto !important;
+}
+.covariates-table .table {
+  font-size: 19px !important;
 }
 .table th, .table td {
   padding: 0.6rem 1.2rem !important;
@@ -4418,7 +4421,7 @@ setTimeout(moveNavbarLogos, 1500);
 <th style="text-align: left;">model</th>
 <th style="text-align: left;">target</th>
 <th style="text-align: right;">n</th>
-<th style="text-align: right;">RMSE</th>
+<th style="text-align: right;">rRMSE</th>
 <th style="text-align: right;">R2</th>
 </tr>
 </thead>
@@ -4427,28 +4430,28 @@ setTimeout(moveNavbarLogos, 1500);
 <td style="text-align: left;">Bloom: peak_model</td>
 <td style="text-align: left;">remaining_peak (ug/L)</td>
 <td style="text-align: right;">1023</td>
-<td style="text-align: right;">2.817</td>
+<td style="text-align: right;">0.254</td>
 <td style="text-align: right;">0.681</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Bloom: duration_model</td>
 <td style="text-align: left;">remaining_duration (days)</td>
 <td style="text-align: right;">1023</td>
-<td style="text-align: right;">8.957</td>
+<td style="text-align: right;">0.699</td>
 <td style="text-align: right;">0.632</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">Bloom: rise_fraction_model</td>
 <td style="text-align: left;">rise_fraction (unitless)</td>
 <td style="text-align: right;">1023</td>
-<td style="text-align: right;">0.142</td>
+<td style="text-align: right;">0.245</td>
 <td style="text-align: right;">0.582</td>
 </tr>
 <tr class="even">
 <td style="text-align: left;">Bloom: decline_rate_model</td>
 <td style="text-align: left;">decline_rate (ug/L/day)</td>
 <td style="text-align: right;">941</td>
-<td style="text-align: right;">0.741</td>
+<td style="text-align: right;">0.700</td>
 <td style="text-align: right;">0.715</td>
 </tr>
 </tbody>

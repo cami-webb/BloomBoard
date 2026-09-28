@@ -7168,11 +7168,11 @@ width/height attributes), so this has to target the svg itself
 with !important to actually shrink it, not just the wrapping
 <pre class="mermaid">. */
 pre.mermaid, .mermaid {
-  max-width: 650px !important;
+  max-width: 720px !important;
   margin: 0 auto !important;
 }
 .mermaid svg {
-  max-width: 650px !important;
+  max-width: 720px !important;
   width: 100% !important;
   height: auto !important;
 }
@@ -7180,7 +7180,7 @@ pre.mermaid, .mermaid {
   max-width: 650px !important;
 }
 .year-panel-figure img {
-  max-width: 650px !important;
+  max-width: 750px !important;
 }
 #title-block-header h1.title {
   font-size: 4rem !important;
@@ -7382,7 +7382,7 @@ setTimeout(moveNavbarLogos, 1500);
 
 <section id="forecast-pipeline" class="level2">
 <h2 data-anchor-id="forecast-pipeline">Forecast pipeline</h2>
-<div style="max-width: 650px; margin: 0 auto 3rem auto; overflow: hidden;">
+<div style="max-width: 720px; margin: 0 auto 3rem auto; overflow: hidden;">
 <div class="cell" data-layout-align="default">
 <div class="cell-output-display">
 <div>
@@ -7415,7 +7415,7 @@ flowchart TD
 </div>
 </div>
 </div>
-<div style="max-width: 700px; margin: 0 auto;">
+<div style="max-width: 740px; margin: 0 auto; font-size: 19px;">
 <p>Each model is retrained from scratch each day on all historical data up to that point. Which chlorophyll model runs depends on whether today’s real chlorophyll is currently above or below the bloom threshold (5 ug/L):</p>
 <ul>
 <li><strong>Bloom day</strong>: four Random Forests, trained on past bloom events, each predict one property of how the current bloom will play out: how high it will peak, how many more days it will last, what fraction of that remaining time will be spent still rising, and how fast it will decline once it peaks. These use today’s buoy covariate readings and each covariate’s own 7-day trend.</li>

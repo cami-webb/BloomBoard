@@ -7264,6 +7264,9 @@ pre.mermaid, .mermaid {
   table-layout: fixed;
   margin: 0 auto 1.5rem auto !important;
 }
+.covariates-table .table {
+  font-size: 19px !important;
+}
 .table th, .table td {
   padding: 0.6rem 1.2rem !important;
 }
@@ -7382,7 +7385,8 @@ setTimeout(moveNavbarLogos, 1500);
 
 <section id="covariates" class="level2">
 <h2 data-anchor-id="covariates">Covariates</h2>
-<p>The six buoy-measured water/air conditions used by the forecast models, all sourced from A01’s own sensors (no external weather forecast data is used):</p>
+<p>The six buoy-measured water/air conditions used by the forecast models, all sourced from A01’s sensors:</p>
+<div class="covariates-table">
 <table class="caption-top table">
 <colgroup>
 <col style="width: 19%">
@@ -7445,6 +7449,21 @@ setTimeout(moveNavbarLogos, 1500);
 </tr>
 </tbody>
 </table>
+</div>
+</section>
+<section id="trajectory-features" class="level2">
+<h2 data-anchor-id="trajectory-features">Trajectory features</h2>
+<p>Beyond the six sensor readings above, the bloom-day models use a few extra features engineered specifically to describe where a bloom is in its life cycle:</p>
+<div style="max-width: 900px; margin: 0 auto; font-size: 19px;">
+<ul>
+<li><strong>Days since bloom started</strong>: how many days it’s been since chlorophyll first crossed the bloom threshold. Lets the model treat day 3 of a bloom differently from day 10 of the same one.</li>
+<li><strong>Rise rate so far</strong>: the average daily increase in chlorophyll since the bloom began. A rate that’s flattening out or turning negative is a strong signal the bloom is already near or past its peak.</li>
+<li><strong>Day of year</strong>: captures seasonality, so a spring bloom is treated differently from a summer or fall one.</li>
+<li><strong>Recent forecast surprise</strong>: how far off a simple “yesterday’s trend continues” guess was from what actually happened today, a rough read on how volatile conditions are right now.</li>
+<li><strong>Each covariate’s 7-day trend</strong>: today’s water/air condition minus its value a week ago, so the model knows whether conditions are warming, cooling, etc., not just their current level.</li>
+<li><strong>Within-day chlorophyll volatility</strong>: how much chlorophyll swung up and down within a single day’s hourly sensor readings (its standard deviation, high-low range, and trend), capturing short-term noise that a single daily average would miss.</li>
+</ul>
+</div>
 </section>
 <section id="forecast-pipeline" class="level2">
 <h2 data-anchor-id="forecast-pipeline">Forecast pipeline</h2>
@@ -7481,13 +7500,12 @@ flowchart TD
 </div>
 </div>
 </div>
-<div style="max-width: 820px; margin: 0 auto; font-size: 19px;">
+<div style="max-width: 900px; margin: 0 auto; font-size: 19px;">
 <p>Each model is retrained from scratch each day on all historical data up to that point. Which chlorophyll model runs depends on whether today’s real chlorophyll is currently above or below the bloom threshold (5 ug/L):</p>
 <ul>
 <li><strong>Bloom day</strong>: four Random Forests, trained on past bloom events, each predict one property of how the current bloom will play out: how high it will peak, how many more days it will last, what fraction of that remaining time will be spent still rising, and how fast it will decline once it peaks. These use today’s buoy covariate readings and each covariate’s own 7-day trend.</li>
 <li><strong>Calm day</strong>: the 6 covariates are first forecast forward a day at a time (by their own Random Forests, using today’s value + DOY to predict tomorrow’s value). A Random Forest then recursively predicts each day’s change in chlorophyll from the day before, using that day’s forecasted covariates.</li>
 </ul>
-<p>Coming soon: covariate details, data sources, and validation methodology.</p>
 </div>
 
 

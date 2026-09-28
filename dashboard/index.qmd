@@ -399,7 +399,10 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     p2_widget <- p2_widget %>%
       plotly::add_trace(
         data = week_df, x = ~as.numeric(day_label), y = ~chlorophyll_forecast,
-        type = "scatter", mode = "markers", marker = list(opacity = 0, size = 1),
+        # opacity 0 hid the legend swatch too (plotly draws it from the
+        # same marker style), so use a small, low-opacity visible marker
+        # instead -- it sits right on top of the existing Forecast point
+        type = "scatter", mode = "markers", marker = list(color = branch_color, opacity = 0.5, size = 3),
         error_y = list(type = "data", symmetric = FALSE,
                        array = week_df$err_ymax - week_df$chlorophyll_forecast,
                        arrayminus = week_df$chlorophyll_forecast - week_df$err_ymin,

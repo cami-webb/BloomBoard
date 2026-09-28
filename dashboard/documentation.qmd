@@ -124,4 +124,6 @@ ranked among the best-performing combinations, while other candidates
 that were tried, like mixed-layer depth and current speed, didn't make
 the cut. This was validated by a few full test runs with these covariates
 to confirm that there was no missing signal from other unincluded covariates.
+
+For more details, see full Documentation in the BloomBoard GitHub (https://github.com/cami-webb/BloomBoard)
 :::

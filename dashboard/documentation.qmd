@@ -18,6 +18,34 @@ models, all sourced from A01's sensors:
 | air_temp   | Air temperature      | met    | -3m (above surface) | °C |
 :::
 
+## Trajectory features
+
+Beyond the six sensor readings above, the bloom-day models use a
+few extra features engineered specifically to describe where a
+bloom is in its life cycle:
+
+::: {style="max-width: 900px; margin: 0 auto; font-size: 19px;"}
+- **Days since bloom started**: how many days it's been since
+  chlorophyll first crossed the bloom threshold. Lets the model
+  treat day 3 of a bloom differently from day 10 of the same one.
+- **Rise rate so far**: the average daily increase in chlorophyll
+  since the bloom began. A rate that's flattening out or turning
+  negative is a strong signal the bloom is already near or past its
+  peak.
+- **Day of year**: captures seasonality, so a spring bloom is
+  treated differently from a summer or fall one.
+- **Recent forecast surprise**: how far off a simple "yesterday's
+  trend continues" guess was from what actually happened today, a
+  rough read on how volatile conditions are right now.
+- **Each covariate's 7-day trend**: today's water/air condition
+  minus its value a week ago, so the model knows whether conditions
+  are warming, cooling, etc., not just their current level.
+- **Within-day chlorophyll volatility**: how much chlorophyll swung
+  up and down within a single day's hourly sensor readings (its
+  standard deviation, high-low range, and trend), capturing
+  short-term noise that a single daily average would miss.
+:::
+
 ## Forecast pipeline
 
 ::: {style="max-width: 720px; margin: 0 auto 3rem auto; overflow: hidden;"}

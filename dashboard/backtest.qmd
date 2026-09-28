@@ -102,6 +102,7 @@ Each row is one year. Full trajectory: every forecast's lead 1-5 days.
 #| fig.width: 16
 #| fig.height: 22
 #| fig.align: center
+#| classes: year-panel-figure
 years <- 2021:2024
 PLOT_LEAD_LIMIT <- 5
 

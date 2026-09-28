@@ -5,18 +5,16 @@ library(ranger)
 library(dplyr)
 library(lubridate)
 
-# Predict this upper quantile (not the mean) of peak/duration/rise/decline on bloom days (there was meaningful underestimation when
-# predicting the mean and a 0.7 quantile produced the best results)
+# Predict the 0.7 quantile (not the mean) of peak/duration/rise/decline on bloom days
 bloom_peak_quantile <- 0.7
 bloom_duration_quantile <- 0.7
 bloom_rise_quantile <- 0.7
 bloom_decline_quantile <- 0.7
 
-# Fixed bloom threshold (µg/L); a dynamic mean classified calm days as blooms
+# Bloom threshold in µg/L
 compute_bloom_threshold <- function(data) 5
 
-# Empirical median fraction of an event's duration from start to peak --
-# fallback for when rise_fraction_model can't be fit (too few bloom events)
+# Median rise fraction across past bloom events (fallback for rise_fraction_model)
 compute_bloom_rise_fraction <- function(data, threshold) {
   d <- data[order(data$date), ]
   is_bloom <- !is.na(d$chlorophyll) & d$chlorophyll > threshold
@@ -32,7 +30,7 @@ compute_bloom_rise_fraction <- function(data, threshold) {
   median(fractions, na.rm = TRUE)
 }
 
-# Median per-day decline rate (peak to event end) across historical bloom events with an observed decline phase
+# Median decline rate across past bloom events
 compute_bloom_decline_rate <- function(data, threshold) {
   d <- data[order(data$date), ]
   is_bloom <- !is.na(d$chlorophyll) & d$chlorophyll > threshold
@@ -141,7 +139,7 @@ train_bloom_models <- function(data, covs, bloom_threshold, importance = "none")
   d <- d[stats::complete.cases(d), ]
   if (nrow(d) < 10) return(NULL)
 
-  # filtered separately so NA decline_rate/rise_fraction rows don't also shrink peak_model/duration_model's training data
+  # filtered separately to avoid dropping peak/duration rows
   d_decline <- base_d
   d_decline$decline_rate <- panel$decline_rate
   d_decline <- d_decline[stats::complete.cases(d_decline), ]
@@ -169,10 +167,7 @@ train_bloom_models <- function(data, covs, bloom_threshold, importance = "none")
                    importance = importance, seed = 42)
   } else NULL
 
-  # attached for diagnostic use (e.g. rRMSE, rBias) see README. oob_bias is
-  # the mean signed OOB residual (ranger keeps OOB predictions in
-  # fit$predictions but not the true targets, so this has to be computed
-  # here while both are still in scope)
+  # oob_bias: mean signed OOB residual, for rRMSE/rBias diagnostics
   attr(peak_model, "target_mean") <- mean(d$remaining_peak)
   attr(peak_model, "oob_bias") <- mean(peak_model$predictions - d$remaining_peak, na.rm = TRUE)
   attr(duration_model, "target_mean") <- mean(d$remaining_duration)
@@ -191,8 +186,7 @@ train_bloom_models <- function(data, covs, bloom_threshold, importance = "none")
       predictor_cols = predictor_cols)
 }
 
-# ref_date's day-index within its bloom event (1 = onset day) and the chlorophyll value on onset day
-# Both NA if ref_date itself isn't currently above threshold
+# Day-index within the bloom event and chlorophyll value on onset day (NA if not in a bloom)
 find_bloom_onset_info <- function(data, ref_date, threshold) {
   bloom_dates <- data$date[!is.na(data$chlorophyll) & data$chlorophyll > threshold]
   if (!(ref_date %in% bloom_dates)) return(list(days_since_onset = NA_integer_, onset_value = NA_real_))
@@ -231,7 +225,7 @@ forecast_bloom <- function(train_data, ref_row, covs, ref_date, horizon, bloom_t
   newdata <- data.frame(chlora_state = current_state, days_since_onset = onset_day,
                         rise_rate_since_onset = rise_rate, doy = lubridate::yday(ref_date),
                         recent_forecast_error = recent_forecast_error)
-  # within-day chlorophyll stats, fall back to 0 (no known volatility) if this day's hourly readings weren't available
+  # hourly chlorophyll stats, default to 0 if unavailable
   for (col in c("chlora_hourly_sd", "chlora_hourly_range", "chlora_hourly_trend")) {
     v <- ref_row[[col]][1]
     newdata[[col]] <- if (!is.null(v) && !is.na(v)) v else 0
@@ -240,8 +234,7 @@ forecast_bloom <- function(train_data, ref_row, covs, ref_date, horizon, bloom_t
     now_val <- lookup_with_fallback(train_data, cov_name, ref_date)
     newdata[[cov_name]] <- now_val
     past_val <- lookup_with_fallback(train_data, cov_name, ref_date - 7)
-    # fall back to 0 (no known change) if that sensor has a gap that a few days of lookback still can't fill (a single gappy covariate
-    # shouldn't block the whole day's forecast)
+    # fall back to 0 if the sensor has a gap
     newdata[[paste0(cov_name, "_trend7")]] <- if (!is.na(now_val) && !is.na(past_val)) now_val - past_val else 0
   }
 
@@ -257,20 +250,16 @@ forecast_bloom <- function(train_data, ref_row, covs, ref_date, horizon, bloom_t
                                quantiles = bloom_duration_quantile)$predictions[, 1]
   pred_remaining_duration <- max(1, round(pred_duration_raw))
 
-  # Build the trajectory from the predicted numbers:
-    # rise to pred_peak over the predicted rise fraction, then decline at the predicted decline_rate with no forced endpoint
+  # build trajectory: rise to pred_peak, then decline at decline_rate
   rise_fraction <- if (!is.null(models$rise_fraction_model)) {
     predict(models$rise_fraction_model, data = newdata, type = "quantiles",
            quantiles = bloom_rise_quantile)$predictions[, 1]
   } else {
     compute_bloom_rise_fraction(train_data, bloom_threshold)
   }
-  # a predicted fraction is a free regression output, not naturally bounded to
-  # (0, 1) the way the empirical fallback is -- clamp so the trajectory always
-  # has both a real rise and decline phase
   if (is.na(rise_fraction)) rise_fraction <- compute_bloom_rise_fraction(train_data, bloom_threshold)
   rise_fraction <- min(max(rise_fraction, 0.05), 0.95)
-  # collapse rise phase to 0 if there's little predicted rise left (avoids a flat plateau before the decline)
+  # skip rise phase if there's little predicted rise left
   rise_gap <- pred_peak - current_state
   rise_days <- if (rise_gap <= 0.2) 0 else max(1, round(pred_remaining_duration * rise_fraction))
   decline_rate <- if (!is.null(models$decline_rate_model)) {

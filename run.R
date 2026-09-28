@@ -25,6 +25,7 @@ run_dates <- resolve_run_dates(cfg)
 for (buoy_id in names(cfg$buoys)) {
   message("Buoy: ", buoy_id)
 
+  # fetch and save training data
   data <- fetch_buoy_data(cfg, buoy_id)
   save_training_data(cfg, buoy_id, data)
 

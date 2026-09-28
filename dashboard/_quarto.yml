@@ -44,10 +44,7 @@ format:
         .navbar-nav .nav-link {
           font-size: 1.1rem !important;
         }
-        /* Bootstrap sets order: 2 on .navbar-brand-container for its own
-           responsive layout, which silently overrides DOM order -- the JS
-           move alone was never enough. Forcing the logo list's flex order
-           below the brand's is what actually determines visual position. */
+        /* orders logos before the brand */
         .navbar-nav.me-auto {
           order: -1 !important;
         }
@@ -69,18 +66,13 @@ format:
           font-weight: 700 !important;
           margin-top: 3rem !important;
         }
-        /* Quarto scales figure images to fill their container responsively,
-           so reducing fig.width in R alone doesn't shrink the displayed
-           size -- capping it here does. */
+        /* caps figure image width */
         .quarto-figure img {
           max-width: 950px;
           margin: 0 auto;
           display: block;
         }
-        /* Mermaid renders as an SVG client-side (mermaid.js sets its own
-           width/height attributes), so this has to target the svg itself
-           with !important to actually shrink it, not just the wrapping
-           <pre class="mermaid">. */
+        /* caps mermaid diagram width */
         pre.mermaid, .mermaid {
           max-width: 800px !important;
           margin: 0 auto !important;
@@ -184,8 +176,7 @@ format:
         .covariates-table .table {
           font-size: 19px !important;
         }
-        /* this table's text is too long for the fixed 720px width used
-           elsewhere -- let it size to its own content instead */
+        /* sizes table to its own content */
         .oob-table .table {
           width: auto !important;
           max-width: none !important;
@@ -209,11 +200,7 @@ format:
         }
         </style>
         <script>
-        // Live site showed the title still before the logos despite this
-        // running on DOMContentLoaded -- some other script (Quarto's own
-        // bundled navbar/search JS) likely rebuilds part of the navbar
-        // after this ran once. Re-applied on load and after a short delay
-        // too, and made idempotent, so it wins regardless of ordering.
+        // moves navbar logos before the brand
         function moveNavbarLogos() {
           var logoList = document.querySelector('#navbarCollapse ul.me-auto');
           var brand = document.querySelector('.navbar-brand-container');

@@ -1,159 +1,187 @@
 # BloomBoard
 
-Forecasts chlorophyll up to `max_horizon` days ahead at a buoy, seeded from
-a chlorophyll observation and the buoy's water condition sensors. 
-No weather forecast covariates.
+BloomBoard forecasts chlorophyll up to `max_horizon` days out at a buoy,
+using a chlorophyll reading and the buoy's own water sensors as the
+starting point. No weather forecast data goes into it.
+
+Check out the live site: [github.com/cami-webb/BloomBoard](https://github.com/cami-webb/BloomBoard).
 
 ## How the forecast works
 
-Each reference date is routed to one of two branches depending on whether
-today's real chlorophyll is above or below a fixed bloom threshold
-(5 µg/L, `compute_bloom_threshold()` in `R/forecast_chlorophyll.R`):
+Every time it runs, it checks whether today's chlorophyll is above or
+below a bloom threshold (5 µg/L, set in `compute_bloom_threshold()` in
+`R/forecast_chlorophyll.R`) and picks one of two paths:
 
-1. **Bloom days** (`forecast_bloom()`): three random forests, each trained
-   once on all historical bloom-period data, predict how high the
-   remaining bloom will peak, how many more days it will last, and its
-   post-peak decline rate. All three are single, non-recursive
-   predictions.The day-by-day trajectory is then built geometrically from those 
-   three numbers (rise linearly to the predicted peak, then decline linearly at
-   the predicted rate), not by stepping the model forward one day at a
-   time.
+1. **Bloom days** (`forecast_bloom()`): four random forests, trained on
+   every past bloom, predict how high the current bloom will still peak,
+   how many days it has left, how much of that time is still spent
+   rising, and how fast it'll decline once it peaks. None of these are
+   recursive, they each just make one prediction. Those four numbers get
+   built into the day-by-day trajectory, which rises to the predicted
+   peak, then declines at the predicted rate (the path is then triangular).
 
-2. **Calm days** (`forecast_calm()`): a single random forest trained only
-   on calm-period data, predicting tomorrow's change in chlorophyll from
-   today's state and water covariates. This one is recursive,
-   each day's prediction becomes the next day's starting state, using
-   `R/forecast_covariates.R`'s own recursively-forecasted covariate values
-   for days beyond the first.
+2. **Calm days** (`forecast_calm()`): one random forest trained only on
+   calm periods, predicting tomorrow's change in chlorophyll from today's
+   value and the water covariates. This one is recursive, so each day's
+   prediction feeds into the next day's, using the covariate forecasts
+   from `R/forecast_covariates.R` past day one.
 
-Both branches use a shared set of buoy water covariates (`covariate_combo`
-in `config.yml`), plus, for the bloom branch only, features
-like days since onset, rise rate since onset, day of year, each
-covariate's 7-day trend, and within-day chlorophyll variability computed
-from the raw hourly readings.
+Both paths use the same buoy covariates (`covariate_combo` in
+`config.yml`). The bloom path also gets a few extra features: days since
+the bloom started, how fast it's been rising, day of year, recent
+forecast error, each covariate's 7-day trend, and how much chlorophyll
+varies within a day.
 
-Chlorophyll isn't read every single day, so the reference date used to
-seed a forecast is the most recent date at or before the run date with a
-real chlorophyll reading (`find_seed_date()` in `R/fetch_data.R`), not
-necessarily the run date itself.
+Chlorophyll readings aren't available every single day, so whenever a
+forecast runs, it seeds from the most recent day that actually has a
+reading, not necessarily today (`find_seed_date()` in `R/fetch_data.R`).
+
+## Covariates
+
+The six water/air conditions the models use, all from A01's sensors
+(set in `config.yml`'s `covariate_combo`):
+
+| Covariate | Description | Sensor | Depth | Units |
+|---|---|---|---|---|
+| `temp_1m` | Water temperature | sbe37 | 1m | °C |
+| `temp_20m` | Water temperature | sbe37 | 20m | °C |
+| `cond_1m` | Conductivity | sbe37 | 1m | mS/cm |
+| `cond_20m` | Conductivity | sbe37 | 20m | mS/cm |
+| `sal_20m` | Salinity | sbe37 | 20m | psu |
+| `air_temp` | Air temperature | met | -3m (above surface) | °C |
+
+## Model development
+
+Random Forest wasn't the first pick, a handful of model types got tried
+before settling on it: ARIMA, XGBoost, a dynamic GAM, and RF. Every
+combination of model type and covariate subset was cross-validated
+against each other, with about 237,000 combinations total. RF performed the best
+with RMSE around 0.27 vs about 0.30 for XGBoost, 0.38
+for GAM, and 0.77 for ARIMA. The same was done to choose the most useful covariates: 
+water temp, conductivity, salinity, and
+air temp kept showing up in the best performing combinations, while
+things like mixed-layer depth and current speed did not perform as well.
 
 ## Design notes
 
-**Bloom threshold is fixed at 5 µg/L, not dynamic.** A dynamic full-record
-mean was tried and reverted as it came out way too low and calm days were being
-classified as blooms
+**Bloom threshold is a fixed 5 µg/L, not dynamic.** A dynamic mean was
+tried at one point and came out way too low so calm days kept getting
+flagged as blooms.
 
-**The bloom sub-models predict an upper quantile (0.7), not the mean, for
-peak magnitude and duration.** Both populations are right-skewed w/ most
-events being short/mild and a few long/large), so the mean prediction
-underestimates actual large events. `decline_rate` also uses the 0.7 quantile, 
-but since it's negative, the upper quantile means a milder
-decline rather than a more extreme one; this was used to counteract
-declines that were going down too fast.
+**The bloom models predict the 0.7 quantile, not the mean, for peak,
+duration, rise fraction, and decline rate.** All of these are
+right-skewed, most blooms are short and mild with a few big ones pulling
+the average down, so predicting the mean kept underestimating large blooms. 
+For decline rate (which is negative) the 0.7 quantile actually
+means a milder decline, which helped fix declines that were coming out
+too steep.
 
-**The rise phase collapses to 0 days if there's little predicted further
-rise.** Without this, a bloom already near its predicted peak would still
-get 1-3 nominal "rise days" (sized off the predicted duration, not the
-actual remaining gap), plateauing before the decline
-instead of declining when it should decline.
+**The rise phase drops to 0 days if there's barely any rise left.**
+Otherwise a bloom that's already at or near its peak would still get a
+couple of "rise days" tacked on and plateau before declining, instead of
+just declining right away.
 
-**`rise_fraction`** is the empirical median fraction of an event's
-duration that elapses before its peak, computed across every historical
-bloom event. Replaces a flat "peak lands halfway through the predicted
-duration" assumption with the shape of historical blooms.
-
-**`recent_forecast_error`** (in `compute_bloom_training_panel()`) is a
-naive-persistence "surprise" signal: today's actual chlorophyll minus a
-naive extrapolation of yesterday's trend (yesterday's value + yesterday's
-own day-over-day change). A positive value means it kept rising when a simple 
-extrapolation would have expected a slowdown. A version using what the model actually
-forecast for today, one day ago, was tried instead and reverted bc
-no parallelism was possible (not worth the backtest slowdown). 
+**`recent_forecast_error`** is basically a "how surprised should the
+model be right now" signal. It's basically today's observed chlorophyll minus what a naive
+guess (yesterday's value plus yesterday's trend) would've predicted. A
+version using the model's actual forecast from a day ago was tried
+instead, but it broke the parallel backtesting and wasn't worth the
+slowdown, so it was reverted to the naive guess.
 
 **Bloom training panel columns** (`compute_bloom_training_panel()`, one
-row per day inside a detected bloom event):
-- `days_since_onset` - 1 = onset day
+row per day inside a bloom):
+- `days_since_onset` - day 1 is the onset day
 - `rise_rate_since_onset` - average daily change since the bloom started
-- `remaining_peak` / `remaining_duration` - the "how high from here" /
-  "how much longer" training targets for `peak_model`/`duration_model`
-- `doy` - day of year, so the model can learn that spring/fall-onset
-  blooms behave differently (often longer, larger) than short summer
-  pulses, instead of predicting the same "typical" duration regardless of
-  season
-- `<cov>_trend7` - each covariate's change over the last 7 days
-- `decline_rate` - this event's own peak-to-end decline rate (µg/L/day,
-  negative), assigned to every row in the event, so `decline_rate_model`
-  can learn that some blooms crash faster or slower than others instead of
-  using one fixed historical average rate for every forecast; NA for
-  events where the peak was the last observed day (no decline phase was
-  ever seen)
+- `remaining_peak` / `remaining_duration` - what `peak_model` and
+  `duration_model` are trying to predict
+- `doy` - day of year, so spring/fall blooms (usually bigger, longer)
+  aren't treated the same as short summer ones
+- `<cov>_trend7` - each covariate's change over the last week
+- `decline_rate` - this bloom's own peak-to-end decline rate, so the
+  model can learn some blooms crash faster than others instead of using
+  one average rate for everything; NA if the peak was the last day
+  observed (no decline ever seen)
+- `rise_fraction` - this bloom's own fraction of its duration spent
+  rising, the target for `rise_fraction_model`
 
-**`target_mean` attribute on fitted models.** `train_bloom_models()` and
-`train_calm_model()` attach each fitted model's own training target mean
-as an R attribute (not an extra return value), so it rides along with the
-model object itself and can't be mismatched against the wrong one. Used
-by `validation/validate_backtest.Rmd` to report relative RMSE.
+**`target_mean`/`oob_bias` attributes.** Each model's training target
+mean and average out-of-bag error get attached directly onto the fitted
+model as attributes, so they travel with the model instead of
+being a separate thing that could get mismatched. `dashboard/backtest.qmd`
+uses these for the rBias/rRMSE numbers in the model fit quality table.
 
-**`lookup_with_fallback()`** (`R/utils.R`) looks up a covariate on a
-target date, falling back to the most recent value within `max_lookback`
-days, then that day-of-year's historical climatological mean. Buoy
-sensors have gaps (equipment downtime, comms outages, sometimes a
-week-plus), so a strict same-day lookup on a single covariate was
-producing entirely NA forecasts on otherwise good days
+**`lookup_with_fallback()`** (`R/utils.R`) looks for a covariate on the
+exact date first, then falls back to the closest value within a few days,
+then to that day-of-year's historical average. Buoy sensors go down
+sometimes, and a strict same day lookup was turning otherwise fine days
+into all-NA forecasts.
 
-**Within-day chlorophyll stats** (`chlora_hourly_sd/range/trend`,
-computed in `load_sensor_daily()` and `scripts/combine_calibrated_chla.R`)
-let the bloom model see whether a day's mean chlorophyll came from a
-stable day or one with a lot of inter-daily variability, not just the
-collapsed daily average.
+**Hourly chlorophyll stats** (`chlora_hourly_sd/range/trend`, from
+`load_sensor_daily()` and `scripts/combine_calibrated_chla.R`) let the
+bloom model tell a stable day apart from a volatile one, instead of only
+seeing the flattened daily average.
+
+## Dashboard site
+
+`dashboard/` is a Quarto site published on GitHub Pages. Pages:
+- `index.qmd` - "Today": current bloom status, 7-day outlook, monthly and
+  annual trend charts, currents map, per buoy.
+- `backtest.qmd` - "Backtest Validations": the 2021-2024 offline backtest,
+  accuracy tables, out-of-bag model fit quality.
+- `documentation.qmd` - "Documentation": covariates, trajectory features,
+  the forecast pipeline diagram, and the model development story (most of
+  what's summarized above).
+- `acknowledgements.qmd` - funding and data source credits.
+- `_quarto.yml` - shared site config and CSS (navbar, fonts, layout).
+- `img/` - navbar logos.
+
+Three GitHub Actions workflows run it:
+- `daily.yaml` - runs `run.R` every day, plus a manual trigger. Pings a
+  healthchecks.io check-in so a failed or missed run gets flagged.
+- `dashboard.yaml` - renders and publishes `index.qmd`, `documentation.qmd`,
+  and `acknowledgements.qmd`, daily and on manual trigger.
+- `backtest-page.yaml` - renders and publishes `backtest.qmd` on its own,
+  manual trigger only, since it pulls ~1500 historical files and doesn't
+  actually change day to day.
+
+Both publishing workflows push to the `gh-pages` branch, and each one only
+touches the files it owns so they don't overwrite each other.
 
 ## Folders and files
 
-- `config.yml` - buoys, their coordinates, their chlorophyll and covariate
-  sensors, which covariates to use (`covariate_combo`), and run
-  settings (`max_horizon`, `run_mode`). Add a buoy by adding a key under
-  `buoys`. Add a covariate by adding a key under that buoy's `covariates`.
-  Each sensor entry has a `historical_url` and `realtime_url`
-  (GoMOOS/NERACOOS data portal file paths) and a `use_realtime` toggle for
-  whether to include the daily-updating feed or just the historical
-  archive. The chlorophyll entry also has a `calibrated_url`, an S3 path
-  to QC'd calibrated chlorophyll data (see `scripts/combine_calibrated_chla.R`
-  below) used instead of the live portal feed whenever `run_mode` is
-  `date_range`.
-- `R/utils.R` - config loading, S3 read/write, sensor data fetching,
-  gap-tolerant covariate lookups.
-- `R/fetch_data.R` - pulls chlorophyll and covariate data for a buoy and
-  joins it into one daily table. Chlorophyll comes from the calibrated S3
-  file in `date_range` mode, or the live portal feed in `daily` mode.
+- `config.yml` - buoys, their coordinates, sensors, which covariates to
+  actually use (`covariate_combo`), and run settings (`max_horizon`,
+  `run_mode`). Add a new buoy by adding a key under `buoys`, add a
+  covariate by adding a key under that buoy's `covariates`. Each sensor
+  has a `historical_url` and `realtime_url` (GoMOOS/NERACOOS file paths)
+  and a `use_realtime` toggle. The chlorophyll entry also has a
+  `calibrated_url` pointing at the QC'd data (see
+  `scripts/combine_calibrated_chla.R`), used instead of the live feed
+  whenever `run_mode` is `date_range`.
+- `R/utils.R` - config loading, S3 read/write, sensor fetching, the
+  gap-tolerant covariate lookup.
+- `R/fetch_data.R` - pulls chlorophyll and covariates for a buoy and joins
+  them into one daily table.
 - `R/forecast_covariates.R` - trains and recursively forecasts each water
-  covariate forward (used by the calm branch).
+  covariate forward (used by the calm path).
 - `R/forecast_chlorophyll.R` - the bloom/calm dispatch and both
-  forecasting branches described above.
-- `run.R` - runs the whole workflow for every configured buoy: fetch data,
-  save training data, forecast covariates, forecast chlorophyll, save
-  forecast output. Controlled by `run_mode` in the config: `daily` runs
-  for today, `date_range` runs a backtest over a date range instead. Same
-  code path either way. Backtests run in parallel across dates via
-  `foreach`/`doParallel` when `NSLOTS` (set by `qsub -pe omp N`) is greater
-  than 1.
+  forecasting paths described above.
+- `run.R` - runs everything for every configured buoy: fetch data, save
+  it, forecast covariates, forecast chlorophyll, save the forecast.
+  `run_mode` in the config decides if it's a `daily` run or a `date_range`
+  backtest, same code path either way. Backtests parallelize across dates
+  via `foreach`/`doParallel` when there's more than one core available.
 - `run.qsub` - SCC batch job for `run.R` (16 cores, for backtests).
-- `.github/workflows/daily.yaml` - runs `run.R` every day and can also be
-  triggered manually. Pings a healthchecks.io check-in after a successful
-  run so a missed or failed daily run gets flagged.
-- `scripts/combine_calibrated_chla.R` - one-time prep script, not part of
-  the daily workflow. Combines the two calibrated chlorophyll spreadsheets
-  (QC'd directly by the people who collected the data, covering deployments
-  the live GoMOOS portal splits across separate per-deployment archives)
-  into one daily CSV plus within-day stats, and uploads it to S3 at
-  `calibrated_url`. Rerun manually only if new calibrated sheets show up.
-  `scripts/combine_calib.qsub` is its SCC batch job.
-- `validation/` - SCC-only, gitignored (not pushed to GitHub). Holds
-  `validate_backtest.Rmd`, which knits a backtest validation report
-  (accuracy by year/lead time/branch, bloom event accuracy, variable
-  importance, out-of-bag model fit quality) from whatever forecast output
-  is currently on S3 for the buoy/date range in `config.yml`, plus its SCC
-  batch job `knit_validation.qsub`, and the report's own output (HTML,
-  CSVs, PNGs) once run. Not part of the daily workflow -- run manually
-  after a backtest.
-  
-*Readme generated/organized with help from Claude :)
+- `dashboard/` - the Quarto site, see above.
+- `.github/workflows/` - the three workflows, see above.
+- `scripts/combine_calibrated_chla.R` - one-time script, not part of the
+  daily run. Combines the two calibrated chlorophyll spreadsheets (collected and QC'd by
+  the MWRA) into one daily CSV with
+  within-day stats, and uploads it to S3. Only needs rerunning if new
+  calibrated sheets show up. `scripts/combine_calib.qsub` is its batch job.
+- `validation/` - SCC-only, not pushed to GitHub. Has
+  `validate_backtest.Rmd`, an older backtest report (accuracy by
+  year/lead time/branch, variable importance, OOB fit) plus its batch job
+  and output. Mostly replaced now by `dashboard/backtest.qmd` for anything
+  public-facing.
+- `logs/` - SCC-only, batch job logs.

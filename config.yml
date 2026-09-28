@@ -36,8 +36,7 @@ buoys:
       historical_url: "archive/A01/csv/A01_optics_s_historical.csv"
       realtime_url: "/data/gomoos/buoy/archive/A0150/realtime/A0150.optics_s.std_flntus.realtime.nc"
       use_realtime: true
-      # Use instead of historical_url/realtime_url above whenever run_mode is "date_range" (backtests). Daily mode always uses the 
-      # live feed since calibrated data won't exist yet for today
+      # used instead of historical_url/realtime_url when run_mode is "date_range"
       calibrated_url: "a01_calibrated_chlorophyll.csv"
     covariates:
       temp_1m:

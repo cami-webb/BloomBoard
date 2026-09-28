@@ -20,8 +20,7 @@ clean_theme <- theme_minimal(base_size = 13) +
        plot.title = element_text(face = "bold", size = 26),
        legend.title = element_blank())
 
-# rough severity tiers for describing a bloom's current level -- not from
-# an established scale for this site, just a reasonable default cutoff
+# rough severity tier for a bloom's current level
 bloom_severity <- function(val) {
   if (val > 20) "severe"
   else if (val > 10) "moderate"
@@ -41,18 +40,7 @@ latest_forecast_for <- function(cfg, buoy_id) {
   fc
 }
 
-# Real forecast accuracy by lead time, computed fresh from this buoy's own
-# recent daily-mode forecast history -- NOT the 2021-2024 offline backtest
-# (same S3 prefix holds both, so backtest dates are explicitly excluded).
-# Bounded to a rolling window so this stays cheap as the daily history
-# grows over time. Returns NULL (no band shown) until enough real
-# forecast/outcome pairs have accumulated to say anything.
-#
-# Uses empirical quantiles of (forecast - observed) rather than RMSE, so the
-# band is a non-parametric prediction interval rather than a symmetric
-# +/-RMSE assumption. Confirmed against real backfilled data that this
-# widens with lead time before switching to it (2.17 ug/L wide at 1-day
-# lead vs 3.5 ug/L at 6-day lead).
+# Empirical quantiles of (forecast - observed) by lead time, for a non-parametric prediction interval
 compute_live_lead_quantiles <- function(cfg, buoy_id, data, bloom_threshold, window_days = 90,
                                         probs = c(0.1, 0.9)) {
   keys <- aws.s3::get_bucket_df(
@@ -97,9 +85,7 @@ compute_live_lead_quantiles <- function(cfg, buoy_id, data, bloom_threshold, win
              n = dplyr::n(), .groups = "drop")
 }
 
-# typical range for this day of year: mean and 10th/90th percentile of
-# chlorophyll within +-window days of target_date's day-of-year, across
-# every year on record
+# typical chlorophyll range for this day of year, across all years on record
 doy_climatology <- function(data, target_date, window = 5) {
   target_doy <- lubridate::yday(target_date)
   doy_all <- lubridate::yday(data$date)
@@ -121,9 +107,6 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   fc <- latest_forecast_for(cfg, buoy_id)
   if (is.null(data) || is.null(fc)) return(NULL)
 
-  # raw forecast CSV written straight into the render output directory (not
-  # a JS/data-URI download trick) so it's just a plain static file, same as
-  # everything else on this GitHub Pages site
   csv_filename <- paste0(buoy_id, "_forecast.csv")
   if (!dir.exists("_site")) dir.create("_site", recursive = TRUE)
   readr::write_csv(fc, file.path("_site", csv_filename))
@@ -135,9 +118,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   branch_color <- if (branch == "Bloom") "#0072B2" else "#56B4E9"
   branch_label <- "Forecast"
 
-  # data freshness: ref_date is the real observation date the forecast was
-  # actually seeded from, which lags today whenever the daily workflow
-  # hasn't run yet or the sensor itself has a gap
+  # days since the forecast's seed observation
   days_gap <- as.integer(Sys.Date() - ref_date)
   data_status_html <- paste0("<p class='data-status'>Data current as of <strong>",
                              format(ref_date, "%B %d, %Y"), "</strong></p>")
@@ -154,26 +135,13 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   ) %>%
     mutate(hover = paste0(format(date, "%b %d, %Y"), "<br>", series, ": ", round(value, 2), " ug/L"))
 
-  # typical (not forecast-model) uncertainty: the same day-of-year
-  # climatology used in the outlook, shaded over the forecast dates only
   fc_clim <- fc_plot %>%
     rowwise() %>%
     mutate(doy_climatology(data, date)) %>%
     ungroup() %>%
     mutate(hover = paste0(format(date, "%b %d"), "<br>Typical range: ", round(clim_low, 1), "-", round(clim_high, 1), " ug/L"))
 
-  # real forecast uncertainty: empirical 10th/90th percentile of this
-  # buoy's own recent forecast error, by lead time (see
-  # compute_live_lead_quantiles above), shown RELATIVE to the 1-day-lead
-  # interval -- day 1 is the zero-width reference point (a 1-day forecast's
-  # own baseline noise isn't shown as "uncertainty"), and later leads show
-  # only the uncertainty that accumulates on top of that baseline. Clamped
-  # so the band never narrows back below the day-1 reference, since the raw
-  # empirical quantiles are noisy enough at longer leads that this isn't
-  # guaranteed otherwise. Falls back to no band until enough real
-  # forecast/outcome pairs exist. err = forecast - observed, so the upper
-  # bound uses the error's 10th percentile and the lower bound uses its
-  # 90th percentile (observed = forecast - err).
+  # forecast uncertainty band, relative to the 1-day-lead interval
   lead_q <- compute_live_lead_quantiles(cfg, buoy_id, data, bloom_threshold)
   fc_uncertainty <- fc %>% mutate(lead_time = as.integer(date - ref_date))
   branch_q <- if (!is.null(lead_q)) lead_q %>% filter(branch == !!branch) else NULL
@@ -187,8 +155,6 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
             hover = paste0(format(date, "%b %d"), "<br>+/- ", round(pmax(rel_high, -rel_low), 1),
                           " ug/L beyond 1-day-lead uncertainty (n=", n, ")"))
 
-    # extend the band back to today at zero width -- a real observation, and
-    # the same reference point as day 1 -- so it starts flush with the line
     if (!is.na(today_val)) {
       day0_row <- data.frame(
         date = ref_date, chlorophyll_forecast = today_val, lead_time = 0L,
@@ -201,11 +167,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     fc_uncertainty <- fc_uncertainty %>% mutate(ymin = NA_real_, ymax = NA_real_, hover = NA_character_)
   }
 
-  # ggplotly() fragments a geom_ribbon into a separate zero-area polygon per
-  # row whenever `text` varies row-to-row (confirmed via isolated test), so
-  # neither ribbon can carry per-date hover text without becoming invisible.
-  # Fold their per-date detail into the forecast line's hover instead, where
-  # per-point text is safe, and leave the ribbons with no text of their own.
+
   ts_combined <- ts_combined %>%
     left_join(fc_clim %>% select(date, clim_low, clim_high), by = "date") %>%
     left_join(fc_uncertainty %>% select(date, ymin, ymax), by = "date") %>%
@@ -217,15 +179,14 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
                           hover)) %>%
     select(-clim_low, -clim_high, -ymin, -ymax)
 
-  # seasonal (day-of-year) average across the whole plotted window -- last
-  # 30 observed days plus the 7-day forecast -- not just the forecast
-  # portion, so it's visible under the observed line too
+  # seasonal average across the whole plotted window
   full_clim <- ts_combined %>%
     distinct(date) %>%
     rowwise() %>%
     mutate(doy_climatology(data, date)) %>%
     ungroup()
 
+  # build Monthly Trend plot
   p <- ggplot(ts_combined, aes(date, value, color = series, group = series, text = hover)) +
     geom_ribbon(data = fc_uncertainty, aes(date, ymin = ymin, ymax = ymax,
                                            fill = "Empirical error range"),
@@ -239,16 +200,13 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     scale_linetype_manual(values = c("Bloom threshold" = "dashed", "Seasonal average" = "dashed"), name = NULL) +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
     clean_theme
-  # title moved to a plain HTML heading (not labs(title=...)) so the caption
-  # can sit between the title and the chart itself, matching the Buoy
-  # Location section's layout
+
   p_caption <- paste0("<p class='section-caption'>Chl-a trends over the last 30 days + ",
                       "7-day forecast with the empirical error range (this site's own ",
                       "historical forecast error for that lead time) shown relative to the ",
                       "1-day-lead forecast. Hover over points for details.</p>")
 
-  # blank spacer line -- an empty <p> renders as visible vertical space
-  # inside the status box using its own p { margin } rule
+
   blank_line <- "<p>&nbsp;</p>"
 
   main_content <- if (branch == "Bloom") {
@@ -268,9 +226,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
           "<p>Forecasted to peak at <strong>", sprintf("%.1f", peak_value), " ug/L</strong> on <strong>",
           format(peak_date, "%b %d"), "</strong>, ", duration_text, "</p>")
   } else {
-    # only mention an upcoming threshold crossing if the forecast actually
-    # shows one -- otherwise this stays silent rather than printing "no
-    # crossing expected" noise every day
+
     above_future <- fc$chlorophyll_forecast > bloom_threshold
     crossing_text <- if (any(above_future)) {
       cross_date <- fc$date[which(above_future)[1]]
@@ -293,11 +249,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     "</div>"
   )
 
-  # 1m water temp forecast for the outlook's secondary axis -- recomputed
-  # live here rather than read from S3, since the daily workflow only
-  # persists chlorophyll_forecast, not the covariate forecasts that fed it
-  # (per this repo's design: only training data and forecast output are
-  # persisted, everything else recomputed fresh each run)
+  # recompute 1m water temp forecast for the outlook's secondary axis
   temp_train <- data[data$date <= ref_date, ]
   temp_model <- train_covariate_model(temp_train, "temp_1m")
   temp_seed <- lookup_with_fallback(data, "temp_1m", ref_date)
@@ -308,6 +260,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     NULL
   }
 
+  # build 7-Day Outlook data
   week_df <- fc %>%
     rowwise() %>%
     mutate(doy_climatology(data, date)) %>%
@@ -328,6 +281,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     week_df$temp_1m_forecast <- NA_real_
   }
 
+  # build 7-Day Outlook plot
   p2 <- ggplot(week_df, aes(day_label)) +
     geom_rect(aes(xmin = as.numeric(day_label) - 0.4, xmax = as.numeric(day_label) + 0.4,
                  ymin = clim_low, ymax = clim_high, fill = "Typical range")) +
@@ -341,13 +295,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     clean_theme +
     theme(panel.grid.major.x = element_blank())
 
-  # ggplotly() names each trace like "(My Label,1,NA)" when the plot has
-  # more than one legend-worthy aesthetic (fill/linetype/color) -- pull the
-  # real label back out. It also makes one trace per row for geom_rect and
-  # geom_segment (one per day here), so the same label shows up in the
-  # legend seven times -- keep only the first occurrence of each name.
-  # The typical-range/seasonal-average traces also get their hover turned
-  # off entirely, so only the forecast point responds to hover.
+  # clean up plotly legend labels and hover/dedup traces
   no_hover <- c("Typical range", "Seasonal average", "Empirical error range")
   no_legend <- character(0)
   polish_traces <- function(p_ly) {
@@ -364,12 +312,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     p_ly
   }
 
-  # height must be passed to ggplotly() itself, not a later layout() call --
-  # config(responsive = TRUE) makes the chart fill its container div's own
-  # actual size, and that div's height comes from ggplotly()'s own `height`
-  # argument at creation time (htmlwidgets' sizingPolicy), not from the
-  # internal chart JSON a later layout(height = ...) call would set. Setting
-  # only the latter is silently ignored once responsive is on.
+  # convert a ggplot to a responsive plotly widget
   make_responsive <- function(gp, height = NULL) {
     plotly::ggplotly(gp, tooltip = "text", height = height) %>%
       polish_traces() %>%
@@ -378,30 +321,13 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
       plotly::config(responsive = TRUE)
   }
 
-  # 1m water temp added as a second line on its own right-hand axis, added
-  # directly as a plotly trace after conversion rather than via ggplot's
-  # sec_axis() -- ggplotly() doesn't reliably carry a ggplot secondary axis
-  # through the conversion, so it's built natively here instead. x must be
-  # the factor's underlying integer position (1..7), not its string label --
-  # ggplotly() converts a discrete ggplot axis to numeric position with
-  # custom tick text under the hood, so a trace added post-conversion has to
-  # match that numeric position to land on the same x as the existing points.
   p2_widget <- make_responsive(p2, height = 560)
 
-  # empirical error range as native plotly error bars, not geom_errorbar()
-  # -- ggplotly() doesn't correctly convert an asymmetric errorbar (ymin and
-  # ymax varying independently per row): it picks one boundary as the
-  # trace's own y position and applies a SYMMETRIC offset from there, which
-  # visibly detaches the bar from the real point and roughly doubles its
-  # height. Built natively here instead, with explicit asymmetric
-  # array/arrayminus centered on the actual chlorophyll_forecast value.
+  # add empirical error range as native plotly error bars
   if (any(!is.na(week_df$err_ymin))) {
     p2_widget <- p2_widget %>%
       plotly::add_trace(
         data = week_df, x = ~as.numeric(day_label), y = ~chlorophyll_forecast,
-        # opacity 0 hid the legend swatch too (plotly draws it from the
-        # same marker style), so use a small, low-opacity visible marker
-        # instead -- it sits right on top of the existing Forecast point
         type = "scatter", mode = "markers", marker = list(color = branch_color, opacity = 0.6, size = 9),
         error_y = list(type = "data", symmetric = FALSE,
                        array = week_df$err_ymax - week_df$chlorophyll_forecast,
@@ -411,6 +337,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
       )
   }
 
+  # add 1m water temp as a second line on a right-hand axis
   if (!is.null(temp1_fc) && any(!is.na(week_df$temp_1m_forecast))) {
     p2_widget <- p2_widget %>%
       plotly::add_trace(
@@ -427,21 +354,12 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
         yaxis2 = list(overlaying = "y", side = "right", showgrid = FALSE,
                       title = list(text = "1m water temp (C)", font = list(size = 17))),
         margin = list(r = 80, b = 130),
-        # legend moved below the plot -- with a right-hand axis added, a
-        # right-side legend collides with the axis title/ticks. y and the
-        # extra height/margin above are tuned generously so the legend
-        # can't overflow the widget's own box and visually cover whatever
-        # HTML comes right after it (Plotly doesn't clip overflow by
-        # default, so an overflowing legend bleeds into following content)
+        # legend below the plot, clear of the right-hand axis
         legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.22, font = list(size = 16))
       )
   }
 
-  # legend order for Monthly Trend: Observed, Forecast, Forecast uncertainty,
-  # Seasonal average, Bloom threshold last. Uses plotly's legendrank rather
-  # than reordering the trace list itself -- trace list order also controls
-  # draw/stacking order (the ribbon needs to stay drawn under the line), so
-  # reordering it to fix the legend would change the visual layering too.
+  # set Monthly Trend legend order
   p_widget <- make_responsive(p)
   legend_rank <- setNames(1:5, c("Observed", branch_label, "Empirical error range",
                                  "Seasonal average", "Bloom threshold"))
@@ -452,12 +370,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     tr
   })
 
-  # Annual Trend: same construction as Monthly Trend, but the observed
-  # window starts Jan 1 of the current year instead of 30 days back. The
-  # forecast/uncertainty band and seasonal-average line are recomputed over
-  # this wider date range rather than reused, since the seasonal-average
-  # line spans whatever's actually plotted and the forecast/uncertainty
-  # pieces are cheap to just rebuild consistently.
+  # build Annual Trend data, same as Monthly Trend but from Jan 1
   year_start <- as.Date(paste0(format(ref_date, "%Y"), "-01-01"))
   annual_recent <- data %>% filter(date >= year_start, date <= ref_date) %>% select(date, chlorophyll)
   annual_ts_combined <- bind_rows(
@@ -481,6 +394,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     mutate(doy_climatology(data, date)) %>%
     ungroup()
 
+  # build Annual Trend plot
   p_annual <- ggplot(annual_ts_combined, aes(date, value, color = series, group = series, text = hover)) +
     geom_ribbon(data = fc_uncertainty, aes(date, ymin = ymin, ymax = ymax,
                                            fill = "Empirical error range"),
@@ -510,11 +424,9 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     tr
   })
 
+  # build Windy currents map
   buoy_lat <- cfg$buoys[[buoy_id]]$lat
   buoy_lon <- cfg$buoys[[buoy_id]]$lon
-  # Windy's free embed defaults to near-current time; viewers drag its own
-  # timeline to see a future date/noon, there's no free way to lock the
-  # iframe to an exact future timestamp without Windy's paid API
   windy_url <- paste0(
     "https://embed.windy.com/embed2.html?lat=", buoy_lat, "&lon=", buoy_lon,
     "&detailLat=", buoy_lat, "&detailLon=", buoy_lon,
@@ -522,10 +434,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     "&menu=&message=true&marker=true&calendar=now&pressure=&type=map",
     "&location=coordinates&metricWind=default&metricTemp=default"
   )
-  # built via JS at page-load time, not a literal <iframe src=...> tag --
-  # Quarto's embed-resources otherwise fetches the iframe's live content at
-  # RENDER time and freezes it into the page as a data: URI (including a
-  # short-lived auth token), which breaks once that token expires
+  # build iframe at page-load time
   map_id <- paste0("windy-map-", buoy_id)
   buoy_map <- htmltools::tagList(
     htmltools::tags$div(id = map_id, style = "width:100%;height:500px;"),

@@ -23,8 +23,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # eco4cast/rocker-neon4cast doesn't ship curl/jq, which the
-      # quarto-actions/setup download script needs
       - name: Install system deps for quarto setup
         run: apt-get update && apt-get install -y --no-install-recommends curl jq
 
@@ -38,15 +36,6 @@ jobs:
       - name: Render backtest page
         run: quarto render dashboard/backtest.qmd --execute-dir "$GITHUB_WORKSPACE"
 
-      # Publishes into an isolated worktree, not the main checkout's working
-      # directory -- `git checkout --orphan` on the latter keeps the entire
-      # index from the just-checked-out main branch (it doesn't clear the
-      # working tree), so a prior version of this step committed the whole
-      # repo onto gh-pages by accident. Also scrubs anything that isn't one
-      # of the known published files on every run, so it self-heals that
-      # branch rather than trusting it stays clean; index/documentation/
-      # acknowledgements.html (published separately by dashboard.yaml) are
-      # explicitly kept.
       - name: Publish to gh-pages
         run: |
           git config user.name github-actions

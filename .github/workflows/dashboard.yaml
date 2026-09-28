@@ -25,8 +25,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # eco4cast/rocker-neon4cast doesn't ship curl/jq, which the
-      # quarto-actions/setup download script needs
       - name: Install system deps for quarto setup
         run: apt-get update && apt-get install -y --no-install-recommends curl jq
 
@@ -37,24 +35,13 @@ jobs:
           Rscript -e 'options(repos=c(CRAN="https://cloud.r-project.org"))'
           Rscript -e 'pkgs <- c("yaml","httr","readr","dplyr","lubridate","aws.s3","ggplot2","plotly","htmltools","purrr","ranger"); need <- pkgs[!pkgs %in% rownames(installed.packages())]; if(length(need)) install.packages(need, Ncpus = 2)'
 
-      # Only the pages that actually change day to day -- backtest.qmd
-      # pulls ~1500 historical S3 files and never changes with the daily
-      # forecast, so it's rendered separately (see backtest-page.yaml),
-      # not on this schedule
+      # backtest.qmd renders separately, see backtest-page.yaml
       - name: Render dashboard pages
         run: |
           quarto render dashboard/index.qmd
           quarto render dashboard/documentation.qmd
           quarto render dashboard/acknowledgements.qmd
 
-      # Publishes into an isolated worktree, not the main checkout's working
-      # directory -- `git checkout --orphan` on the latter keeps the entire
-      # index from the just-checked-out main branch (it doesn't clear the
-      # working tree), so a prior version of this step committed the whole
-      # repo onto gh-pages by accident. Also scrubs anything that isn't one
-      # of the known published files on every run, so it self-heals that
-      # branch rather than trusting it stays clean; backtest.html (published
-      # separately by backtest-page.yaml) is explicitly kept.
       - name: Publish to gh-pages
         run: |
           git config user.name github-actions

@@ -6,10 +6,7 @@ fetch_buoy_data <- function(cfg, buoy_id) {
   buoy <- cfg$buoys[[buoy_id]]
 
   message("Loading chlorophyll for ", buoy_id)
-  # date_range (backtest) mode uses the calibrated chlorophyll file; daily
-  # mode uses the live feed. Both sources' value_sd/value_range/value_trend
-  # columns are renamed the same way below so downstream code doesn't care
-  # which source produced them.
+  # backtest mode uses the calibrated chlorophyll file; live mode uses the daily feed
   if (cfg$run_mode == "date_range" && !is.null(buoy$chlorophyll$calibrated_url)) {
     chl <- load_calibrated_chlorophyll(cfg, buoy$chlorophyll$calibrated_url)
   } else {

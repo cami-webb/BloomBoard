@@ -21,8 +21,8 @@ models, all sourced from A01's sensors:
 ## Trajectory features
 
 Beyond the six sensor readings above, the bloom-day models use a
-few extra features engineered specifically to describe where a
-bloom is in its life cycle:
+few extra features to help describe where a bloom is in its life
+cycle:
 
 ::: {style="max-width: 900px; margin: 0 auto; font-size: 19px;"}
 - **Days since bloom started**: how many days it's been since

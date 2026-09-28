@@ -99,7 +99,7 @@ Each row is one year. Full trajectory: every forecast's lead 1-5 days.
 ```{r panel_plot}
 #| echo: false
 #| warning: false
-#| fig.width: 16
+#| fig.width: 18.5
 #| fig.height: 22
 #| fig.align: center
 #| classes: year-panel-figure

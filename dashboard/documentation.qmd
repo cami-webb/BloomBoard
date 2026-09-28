@@ -4,7 +4,7 @@ title: "Documentation"
 
 ## Forecast pipeline
 
-::: {style="max-width: 650px; margin: 0 auto 3rem auto; overflow: hidden;"}
+::: {style="max-width: 720px; margin: 0 auto 3rem auto; overflow: hidden;"}
 ```{mermaid}
 %%{init: {'flowchart': {'wrappingWidth': 400}}}%%
 flowchart TD

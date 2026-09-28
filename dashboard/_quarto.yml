@@ -178,6 +178,9 @@ format:
           table-layout: fixed;
           margin: 0 auto 1.5rem auto !important;
         }
+        .covariates-table .table {
+          font-size: 19px !important;
+        }
         .table th, .table td {
           padding: 0.6rem 1.2rem !important;
         }

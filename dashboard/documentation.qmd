@@ -7,10 +7,10 @@ title: "Documentation"
 ::: {style="max-width: 650px; margin: 0 auto; overflow: hidden;"}
 ```{mermaid}
 flowchart TD
-    A["Today's chl-a observation + 6 covariates:<br/>&bull; Water temp (1m, 20m) &bull; Conductivity (1m, 20m) &bull; Salinity (20m) &bull; Air temperature"]
+    A["Today's chl-a observation + 6 covariates:<br/>&bull; Water temp (1m, 20m)<br/>&bull; Conductivity (1m, 20m)<br/>&bull; Salinity (20m)<br/>&bull; Air temperature"]
     A --> Q{"Is today's chlorophyll above 5 ug/L?"}
 
-    Q -->|"Yes -- bloom in progress"| BM["4 Random Forests trained only on past bloom events, using:<br/>&bull; Days since bloom started &bull; Rise rate so far &bull; Day of year &bull; Recent forecast surprise &bull; Each covariate's own 7-day trend &bull; Within-day chl-a volatility"]
+    Q -->|"Yes -- bloom in progress"| BM["4 Random Forests trained only on past bloom events, using:<br/>&bull; Days since bloom started<br/>&bull; Rise rate so far<br/>&bull; Day of year<br/>&bull; Recent forecast surprise<br/>&bull; Each covariate's own 7-day trend<br/>&bull; Within-day chl-a volatility"]
     BM --> BM1[Predict remaining peak magnitude]
     BM --> BM2[Predict remaining duration]
     BM --> BM4[Predict rise fraction]

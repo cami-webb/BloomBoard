@@ -218,8 +218,10 @@ imp_calm_model <- train_calm_model(data, covs, bloom_threshold)
 
 oob_row <- function(fit, model_name, target_name) {
   if (is.null(fit)) return(NULL)
+  rmse <- sqrt(fit$prediction.error)
+  target_mean <- attr(fit, "target_mean")
   tibble(model = model_name, target = target_name, n = fit$num.samples,
-        RMSE = sqrt(fit$prediction.error), R2 = fit$r.squared)
+        rRMSE = rmse / abs(target_mean), R2 = fit$r.squared)
 }
 
 oob_table <- bind_rows(

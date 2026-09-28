@@ -4,7 +4,7 @@ title: "Documentation"
 
 ## Forecast pipeline
 
-::: {style="max-width: 650px; margin: 0 auto; overflow: hidden;"}
+::: {style="max-width: 650px; margin: 0 auto 3rem auto; overflow: hidden;"}
 ```{mermaid}
 flowchart TD
     A["Today's chl-a observation + 6 covariates:<br/>&bull; Water temp (1m, 20m)<br/>&bull; Conductivity (1m, 20m)<br/>&bull; Salinity (20m)<br/>&bull; Air temperature"]
@@ -28,26 +28,21 @@ flowchart TD
 ```
 :::
 
-Every model here is retrained from scratch each day on all historical
-data up to that point -- nothing is persisted between days except the
-growing observation record and each day's forecast output. Which
-chlorophyll model runs depends on whether today's real chlorophyll is
-currently above or below the bloom threshold (5 ug/L):
+Each model is retrained from scratch each day on all historical data
+up to that point. Which chlorophyll model runs depends on whether
+today's real chlorophyll is currently above or below the bloom
+threshold (5 ug/L):
 
-- **Bloom day**: four Random Forests, trained only on past bloom
-  events, each predict one property of how the current bloom will
-  play out -- how high it will still peak, how many more days it
-  will last, what fraction of that remaining time will be spent
-  still rising, and how fast it will decline once it peaks. These
-  use today's real covariate readings and each covariate's own
-  7-day trend directly, not a multi-day forecast of them, since the
-  whole trajectory is predicted in one shot rather than day by day.
+- **Bloom day**: four Random Forests, trained on past bloom events,
+  each predict one property of how the current bloom will play out:
+  how high it will peak, how many more days it will last, what
+  fraction of that remaining time will be spent still rising, and
+  how fast it will decline once it peaks. These use today's buoy
+  covariate readings and each covariate's own 7-day trend.
 - **Calm day**: the 6 covariates are first forecast forward a day at
-  a time (their own simple Random Forests, today's value + day of
-  year predicting tomorrow's value), since a calm-day forecast
-  genuinely needs to know what conditions will look like on each
-  future day. A single Random Forest then recursively predicts each
-  day's change in chlorophyll from the day before, using that day's
-  forecasted covariates.
+  a time (by their own Random Forests, using today's value + DOY to
+  predict tomorrow's value). A Random Forest then recursively
+  predicts each day's change in chlorophyll from the day before,
+  using that day's forecasted covariates.
 
 Coming soon: covariate details, data sources, and validation methodology.

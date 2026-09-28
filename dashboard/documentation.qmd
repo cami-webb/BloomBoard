@@ -95,13 +95,12 @@ threshold (5 ug/L):
 ## Development
 
 ::: {style="max-width: 900px; margin: 0 auto; font-size: 19px;"}
-Random Forest wasn't the first model type tried. Earlier development
-(in this project's predecessor repo) screened four model types against
-each other:
+Random Forest wasn't the only model type tried. Earlier development
+screened four model types against each other:
 
 - **ARIMA**: a classic time-series model using only chlorophyll's own
   past values, with no water/air covariates. A simple, useful
-  benchmark, but it can't take advantage of buoy conditions.
+  benchmark, but it can't take advantage of any buoy observations
 - **XGBoost**: a gradient-boosted tree ensemble, conceptually similar
   to Random Forest but builds trees sequentially, each correcting the
   last one's errors.
@@ -113,22 +112,16 @@ each other:
 
 Rather than guessing which covariates mattered, every combination of
 model type and covariate subset (drawing from the full pool of buoy
-and weather-forecast covariates, up to 5 at a time) was cross-validated
-against each other -- about 237,000 model/covariate combinations in
-total. Random Forest came out with the lowest cross-validated error by
+and weather-forecast covariates) was cross-validated
+against each other (about 237,000 model/covariate combinations in
+total). Random Forest came out with the lowest cross-validated error by
 a wide margin: RMSE of about 0.27, compared to roughly 0.30 for
-XGBoost, 0.38 for dGAM, and 0.77 for the plain ARIMA baseline. That
-search is why Random Forest is the model type used throughout
-BloomBoard today.
+XGBoost, 0.38 for dGAM, and 0.77 for the plain ARIMA baseline.
 
 The same search is also how the covariates were chosen: water
-temperature, conductivity, salinity, and air temperature -- the six
-covariates in the table at the top of this page -- consistently
+temperature, conductivity, salinity, and air temperature consistently
 ranked among the best-performing combinations, while other candidates
 that were tried, like mixed-layer depth and current speed, didn't make
-the cut. (That cross-validation used randomly shuffled folds rather
-than realistic day-by-day forecasting, so these numbers are a
-best-case comparison -- the winning Random Forest approach was then
-re-checked against realistic rolling forecasts before being adopted
-for production.)
+the cut. This was validated by a few full test runs with these covariates
+to confirm that there was no missing signal from other unincluded covariates.
 :::

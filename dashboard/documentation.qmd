@@ -4,7 +4,7 @@ title: "Documentation"
 
 ## Forecast pipeline
 
-::: {style="max-width: 1100px; margin: 0 auto; overflow: hidden;"}
+::: {style="max-width: 650px; margin: 0 auto; overflow: hidden;"}
 ```{mermaid}
 flowchart TD
     A["Today's chl-a observation + 6 covariates:<br/>&bull; Water temp (1m, 20m) &bull; Conductivity (1m, 20m) &bull; Salinity (20m) &bull; Air temperature"]

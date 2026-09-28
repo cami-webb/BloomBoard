@@ -74,6 +74,19 @@ format:
           margin: 0 auto;
           display: block;
         }
+        /* Mermaid renders as an SVG client-side (mermaid.js sets its own
+           width/height attributes), so this has to target the svg itself
+           with !important to actually shrink it, not just the wrapping
+           <pre class="mermaid">. */
+        pre.mermaid, .mermaid {
+          max-width: 500px !important;
+          margin: 0 auto !important;
+        }
+        .mermaid svg {
+          max-width: 500px !important;
+          width: 100% !important;
+          height: auto !important;
+        }
         .pred-obs-figure img {
           max-width: 650px !important;
         }

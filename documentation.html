@@ -7388,9 +7388,10 @@ setTimeout(moveNavbarLogos, 1500);
 <div>
 <p></p><figure class="figure"><p></p>
 <div>
-<pre class="mermaid mermaid-js">flowchart TD
+<pre class="mermaid mermaid-js">%%{init: {&#39;flowchart&#39;: {&#39;wrappingWidth&#39;: 400}}}%%
+flowchart TD
     A[&quot;Today&#39;s chl-a observation + 6 covariates:&lt;br/&gt;&amp;bull; Water temp (1m, 20m)&lt;br/&gt;&amp;bull; Conductivity (1m, 20m)&lt;br/&gt;&amp;bull; Salinity (20m)&lt;br/&gt;&amp;bull; Air temperature&quot;]
-    A --&gt; Q{&quot;Is today&#39;s chlorophyll above 5 ug/L?&quot;}
+    A --&gt; Q((&quot;Is today&#39;s chlorophyll above 5 ug/L?&quot;))
 
     Q --&gt;|&quot;Yes -- bloom in progress&quot;| BM[&quot;4 Random Forests trained on past blooms:&lt;br/&gt;&amp;bull; Days since bloom started&lt;br/&gt;&amp;bull; Rise rate so far&lt;br/&gt;&amp;bull; Day of year&lt;br/&gt;&amp;bull; Recent forecast surprise&lt;br/&gt;&amp;bull; Each covariate&#39;s own 7-day trend&lt;br/&gt;&amp;bull; Within-day chl-a volatility&quot;]
     BM --&gt; BM1[Predict remaining peak magnitude]
@@ -7414,12 +7415,14 @@ setTimeout(moveNavbarLogos, 1500);
 </div>
 </div>
 </div>
+<div style="max-width: 700px; margin: 0 auto;">
 <p>Each model is retrained from scratch each day on all historical data up to that point. Which chlorophyll model runs depends on whether today’s real chlorophyll is currently above or below the bloom threshold (5 ug/L):</p>
 <ul>
 <li><strong>Bloom day</strong>: four Random Forests, trained on past bloom events, each predict one property of how the current bloom will play out: how high it will peak, how many more days it will last, what fraction of that remaining time will be spent still rising, and how fast it will decline once it peaks. These use today’s buoy covariate readings and each covariate’s own 7-day trend.</li>
 <li><strong>Calm day</strong>: the 6 covariates are first forecast forward a day at a time (by their own Random Forests, using today’s value + DOY to predict tomorrow’s value). A Random Forest then recursively predicts each day’s change in chlorophyll from the day before, using that day’s forecasted covariates.</li>
 </ul>
 <p>Coming soon: covariate details, data sources, and validation methodology.</p>
+</div>
 
 
 </section>

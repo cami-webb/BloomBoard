@@ -82,11 +82,11 @@ format:
            with !important to actually shrink it, not just the wrapping
            <pre class="mermaid">. */
         pre.mermaid, .mermaid {
-          max-width: 720px !important;
+          max-width: 800px !important;
           margin: 0 auto !important;
         }
         .mermaid svg {
-          max-width: 720px !important;
+          max-width: 800px !important;
           width: 100% !important;
           height: auto !important;
         }

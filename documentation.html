@@ -7380,6 +7380,72 @@ setTimeout(moveNavbarLogos, 1500);
 </header>
 
 
+<section id="covariates" class="level2">
+<h2 data-anchor-id="covariates">Covariates</h2>
+<p>The six buoy-measured water/air conditions used by the forecast models, all sourced from A01’s own sensors (no external weather forecast data is used):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 19%">
+<col style="width: 34%">
+<col style="width: 12%">
+<col style="width: 22%">
+<col style="width: 11%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Covariate</th>
+<th>Description</th>
+<th>Sensor</th>
+<th>Depth</th>
+<th>Units</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>temp_1m</td>
+<td>Water temperature</td>
+<td>sbe37</td>
+<td>1m</td>
+<td>°C</td>
+</tr>
+<tr class="even">
+<td>cond_1m</td>
+<td>Conductivity</td>
+<td>sbe37</td>
+<td>1m</td>
+<td>mS/cm</td>
+</tr>
+<tr class="odd">
+<td>temp_20m</td>
+<td>Water temperature</td>
+<td>sbe37</td>
+<td>20m</td>
+<td>°C</td>
+</tr>
+<tr class="even">
+<td>sal_20m</td>
+<td>Salinity</td>
+<td>sbe37</td>
+<td>20m</td>
+<td>psu</td>
+</tr>
+<tr class="odd">
+<td>cond_20m</td>
+<td>Conductivity</td>
+<td>sbe37</td>
+<td>20m</td>
+<td>mS/cm</td>
+</tr>
+<tr class="even">
+<td>air_temp</td>
+<td>Air temperature</td>
+<td>met</td>
+<td>-3m (above surface)</td>
+<td>°C</td>
+</tr>
+</tbody>
+</table>
+</section>
 <section id="forecast-pipeline" class="level2">
 <h2 data-anchor-id="forecast-pipeline">Forecast pipeline</h2>
 <div style="max-width: 720px; margin: 0 auto 3rem auto; overflow: hidden;">
@@ -7415,7 +7481,7 @@ flowchart TD
 </div>
 </div>
 </div>
-<div style="max-width: 740px; margin: 0 auto; font-size: 19px;">
+<div style="max-width: 820px; margin: 0 auto; font-size: 19px;">
 <p>Each model is retrained from scratch each day on all historical data up to that point. Which chlorophyll model runs depends on whether today’s real chlorophyll is currently above or below the bloom threshold (5 ug/L):</p>
 <ul>
 <li><strong>Bloom day</strong>: four Random Forests, trained on past bloom events, each predict one property of how the current bloom will play out: how high it will peak, how many more days it will last, what fraction of that remaining time will be spent still rising, and how fast it will decline once it peaks. These use today’s buoy covariate readings and each covariate’s own 7-day trend.</li>

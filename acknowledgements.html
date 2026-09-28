@@ -4074,6 +4074,9 @@ pre.mermaid, .mermaid {
   width: 100% !important;
   height: auto !important;
 }
+.mermaid svg text, .mermaid svg tspan {
+  font-family: 'Barlow Condensed', sans-serif !important;
+}
 .pred-obs-figure img {
   max-width: 650px !important;
 }
@@ -4164,6 +4167,13 @@ pre.mermaid, .mermaid {
 }
 .covariates-table .table {
   font-size: 19px !important;
+}
+/* this table's text is too long for the fixed 720px width used
+   elsewhere -- let it size to its own content instead */
+.oob-table .table {
+  width: auto !important;
+  max-width: none !important;
+  table-layout: auto;
 }
 .table th, .table td {
   padding: 0.6rem 1.2rem !important;

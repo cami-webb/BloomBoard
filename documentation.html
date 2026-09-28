@@ -7176,6 +7176,9 @@ pre.mermaid, .mermaid {
   width: 100% !important;
   height: auto !important;
 }
+.mermaid svg text, .mermaid svg tspan {
+  font-family: 'Barlow Condensed', sans-serif !important;
+}
 .pred-obs-figure img {
   max-width: 650px !important;
 }
@@ -7266,6 +7269,13 @@ pre.mermaid, .mermaid {
 }
 .covariates-table .table {
   font-size: 19px !important;
+}
+/* this table's text is too long for the fixed 720px width used
+   elsewhere -- let it size to its own content instead */
+.oob-table .table {
+  width: auto !important;
+  max-width: none !important;
+  table-layout: auto;
 }
 .table th, .table td {
   padding: 0.6rem 1.2rem !important;
@@ -7506,6 +7516,20 @@ flowchart TD
 <li><strong>Bloom day</strong>: four Random Forests, trained on past bloom events, each predict one property of how the current bloom will play out: how high it will peak, how many more days it will last, what fraction of that remaining time will be spent still rising, and how fast it will decline once it peaks. These use today’s buoy covariate readings and each covariate’s own 7-day trend.</li>
 <li><strong>Calm day</strong>: the 6 covariates are first forecast forward a day at a time (by their own Random Forests, using today’s value + DOY to predict tomorrow’s value). A Random Forest then recursively predicts each day’s change in chlorophyll from the day before, using that day’s forecasted covariates.</li>
 </ul>
+</div>
+</section>
+<section id="development" class="level2">
+<h2 data-anchor-id="development">Development</h2>
+<div style="max-width: 900px; margin: 0 auto; font-size: 19px;">
+<p>Random Forest wasn’t the first model type tried. Earlier development (in this project’s predecessor repo) screened four model types against each other:</p>
+<ul>
+<li><strong>ARIMA</strong>: a classic time-series model using only chlorophyll’s own past values, with no water/air covariates. A simple, useful benchmark, but it can’t take advantage of buoy conditions.</li>
+<li><strong>XGBoost</strong>: a gradient-boosted tree ensemble, conceptually similar to Random Forest but builds trees sequentially, each correcting the last one’s errors.</li>
+<li><strong>Dynamic GAM (dGAM)</strong>: a generalized additive model that captures smooth, nonlinear relationships between covariates and chlorophyll.</li>
+<li><strong>Random Forest</strong>: an ensemble of many independent decision trees, each trained on a random subset of the data and covariates, then averaged together.</li>
+</ul>
+<p>Rather than guessing which covariates mattered, every combination of model type and covariate subset (drawing from the full pool of buoy and weather-forecast covariates, up to 5 at a time) was cross-validated against each other – about 237,000 model/covariate combinations in total. Random Forest came out with the lowest cross-validated error by a wide margin: RMSE of about 0.27, compared to roughly 0.30 for XGBoost, 0.38 for dGAM, and 0.77 for the plain ARIMA baseline. That search is why Random Forest is the model type used throughout BloomBoard today.</p>
+<p>The same search is also how the covariates were chosen: water temperature, conductivity, salinity, and air temperature – the six covariates in the table at the top of this page – consistently ranked among the best-performing combinations, while other candidates that were tried, like mixed-layer depth and current speed, didn’t make the cut. (That cross-validation used randomly shuffled folds rather than realistic day-by-day forecasting, so these numbers are a best-case comparison – the winning Random Forest approach was then re-checked against realistic rolling forecasts before being adopted for production.)</p>
 </div>
 
 

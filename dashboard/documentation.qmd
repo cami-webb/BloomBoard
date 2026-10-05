@@ -74,7 +74,7 @@ flowchart TD
 :::
 
 ::: {style="max-width: 900px; margin: 0 auto; font-size: 19px;"}
-The forecast is an ensemble of 100 members instead of a single line.
+The forecast is an ensemble of 100 members.
 Each Random Forest is a quantile regression forest, so for a given set
 of inputs it estimates the full distribution of the value it is
 predicting, not just the average. It does this by collecting the past
@@ -175,10 +175,11 @@ northwest Massachusetts Bay in 2000 (Jiang et al. 2007). At A01, daily means
 exceed 5 ug/L on about 18% of days and 20 ug/L on about 0.1% of days
 (2005-2025), and chlorophyll fluorescence at the buoy peaked above 20 ug/L in
 late April and early May 2023, during the exceptional *Tripos muelleri* bloom
-(MWRA 2024). The 10 ug/L boundary between mild and moderate is not a
-published threshold. It is a local split, roughly the 96th percentile of
-daily values at A01. These benchmarks were developed for site samples or
-annual maxima rather than daily buoy fluorescence, and high chlorophyll does
+(MWRA 2024). The 10 ug/L boundary between mild and moderate is NOT a
+published threshold, it was set experimentally and is roughly the 96th
+percentile of daily values at A01. Note: these benchmarks were developed
+either for site samples or annual maxima rather than daily buoy
+fluorescence, like we use, and high chlorophyll does
 not mean a bloom is harmful, which MWRA tracks separately through species
 counts (MWRA 2024).
 

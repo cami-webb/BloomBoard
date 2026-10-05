@@ -59,9 +59,7 @@ latest_forecast_for <- function(cfg, buoy_id) {
   raw <- read_s3_csv(cfg, cfg$s3$write_path, basename(keys[which.max(ref_dates)]))
   summary <- raw %>%
     group_by(date = as.Date(datetime)) %>%
-    summarise(chlorophyll_forecast = mean(prediction),
-              q10 = quantile(prediction, 0.1, names = FALSE),
-              q90 = quantile(prediction, 0.9, names = FALSE), .groups = "drop") %>%
+    summarise(chlorophyll_forecast = mean(prediction), sd = sd(prediction), .groups = "drop") %>%
     mutate(ref_date = max(ref_dates))
   list(raw = raw, summary = summary)
 }
@@ -126,10 +124,10 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     ungroup() %>%
     mutate(hover = paste0(format(date, "%b %d"), "<br>Typical range: ", round(clim_low, 1), "-", round(clim_high, 1), " ug/L"))
 
-  # forecast uncertainty band: 10th to 90th percentile across the ensemble members
+  # forecast uncertainty band: average plus or minus one standard deviation across the ensemble members
   fc_uncertainty <- fc %>%
-    transmute(date, chlorophyll_forecast, ymin = q10, ymax = q90,
-              hover = paste0(format(date, "%b %d"), "<br>80% interval: ", round(q10, 1), "-", round(q90, 1), " ug/L"))
+    transmute(date, chlorophyll_forecast, ymin = pmax(0, chlorophyll_forecast - sd), ymax = chlorophyll_forecast + sd,
+              hover = paste0(format(date, "%b %d"), "<br>Uncertainty (±1 SD): ", round(ymin, 1), "-", round(ymax, 1), " ug/L"))
   if (!is.na(today_val)) {
     day0_row <- data.frame(date = ref_date, chlorophyll_forecast = today_val, ymin = today_val, ymax = today_val,
                            hover = paste0(format(ref_date, "%b %d"), "<br>", round(today_val, 1), " ug/L (observed)"))
@@ -143,7 +141,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
                           paste0(hover, "<br>Typical range: ", round(clim_low, 1), "-", round(clim_high, 1), " ug/L"),
                           hover),
           hover = ifelse(series == branch_label & !is.na(ymin),
-                          paste0(hover, "<br>80% interval: ", round(ymin, 1), "-", round(ymax, 1), " ug/L"),
+                          paste0(hover, "<br>Uncertainty (±1 SD): ", round(ymin, 1), "-", round(ymax, 1), " ug/L"),
                           hover)) %>%
     select(-clim_low, -clim_high, -ymin, -ymax)
 
@@ -157,21 +155,21 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   # build Monthly Trend plot
   p <- ggplot(ts_combined, aes(date, value, color = series, group = series, text = hover)) +
     geom_ribbon(data = fc_uncertainty, aes(date, ymin = ymin, ymax = ymax,
-                                           fill = "80% ensemble interval"),
+                                           fill = "Uncertainty (±1 SD)"),
                inherit.aes = FALSE, alpha = 0.3) +
     geom_line(data = full_clim, aes(date, clim_mean, linetype = "Seasonal average"),
              inherit.aes = FALSE, color = "grey40") +
     geom_line(linewidth = 0.6) +
     geom_hline(aes(yintercept = bloom_threshold, linetype = "Bloom threshold"), color = "red") +
     scale_color_manual(values = setNames(c("black", branch_color), c("Observed", branch_label)), name = NULL) +
-    scale_fill_manual(values = c("80% ensemble interval" = branch_color), name = NULL) +
+    scale_fill_manual(values = c("Uncertainty (±1 SD)" = branch_color), name = NULL) +
     scale_linetype_manual(values = c("Bloom threshold" = "dashed", "Seasonal average" = "dashed"), name = NULL) +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
     clean_theme
 
   p_caption <- paste0("<p class='section-caption'>Chl-a trends over the last 30 days + ",
-                      "7-day forecast with the 80% ensemble interval (10th to 90th percentile ",
-                      "of the 100 ensemble members). Hover over points for details.</p>")
+                      "7-day forecast with the ensemble uncertainty (average plus or minus one ",
+                      "standard deviation across the 100 ensemble members). Hover over points for details.</p>")
 
 
   blank_line <- "<p>&nbsp;</p>"
@@ -241,7 +239,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
                         " ug/L<br>", sprintf("%+.1f", deviation), " ug/L vs seasonal normal",
                         "<br>Typical range: ", round(clim_low, 1), "-", round(clim_high, 1), " ug/L",
                         ifelse(!is.na(err_ymin),
-                               paste0("<br>80% ensemble interval: ", round(err_ymin, 1), "-",
+                               paste0("<br>Uncertainty (±1 SD): ", round(err_ymin, 1), "-",
                                      round(err_ymax, 1), " ug/L"), "")))
   if (!is.null(temp1_fc)) {
     week_df <- week_df %>% left_join(temp1_fc, by = "date")
@@ -264,7 +262,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     theme(panel.grid.major.x = element_blank())
 
   # clean up plotly legend labels and hover/dedup traces
-  no_hover <- c("Typical range", "Seasonal average", "80% ensemble interval")
+  no_hover <- c("Typical range", "Seasonal average", "Uncertainty (±1 SD)")
   no_legend <- character(0)
   polish_traces <- function(p_ly) {
     seen <- character(0)
@@ -291,7 +289,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
 
   p2_widget <- make_responsive(p2, height = 560)
 
-  # add 80% ensemble interval as native plotly error bars
+  # add the ensemble uncertainty as native plotly error bars
   if (any(!is.na(week_df$err_ymin))) {
     p2_widget <- p2_widget %>%
       plotly::add_trace(
@@ -301,7 +299,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
                        array = week_df$err_ymax - week_df$chlorophyll_forecast,
                        arrayminus = week_df$chlorophyll_forecast - week_df$err_ymin,
                        color = branch_color, thickness = 2, width = 6),
-        name = "80% ensemble interval", hoverinfo = "skip", showlegend = TRUE
+        name = "Uncertainty (±1 SD)", hoverinfo = "skip", showlegend = TRUE
       )
   }
 
@@ -329,7 +327,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
 
   # set Monthly Trend legend order
   p_widget <- make_responsive(p)
-  legend_rank <- setNames(1:5, c("Observed", branch_label, "80% ensemble interval",
+  legend_rank <- setNames(1:5, c("Observed", branch_label, "Uncertainty (±1 SD)",
                                  "Seasonal average", "Bloom threshold"))
   p_widget$x$data <- lapply(p_widget$x$data, function(tr) {
     if (!is.null(tr$name) && tr$name %in% names(legend_rank)) {
@@ -352,7 +350,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
                           paste0(hover, "<br>Typical range: ", round(clim_low, 1), "-", round(clim_high, 1), " ug/L"),
                           hover),
           hover = ifelse(series == branch_label & !is.na(ymin),
-                          paste0(hover, "<br>80% interval: ", round(ymin, 1), "-", round(ymax, 1), " ug/L"),
+                          paste0(hover, "<br>Uncertainty (±1 SD): ", round(ymin, 1), "-", round(ymax, 1), " ug/L"),
                           hover)) %>%
     select(-clim_low, -clim_high, -ymin, -ymax)
 
@@ -365,14 +363,14 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   # build Annual Trend plot
   p_annual <- ggplot(annual_ts_combined, aes(date, value, color = series, group = series, text = hover)) +
     geom_ribbon(data = fc_uncertainty, aes(date, ymin = ymin, ymax = ymax,
-                                           fill = "80% ensemble interval"),
+                                           fill = "Uncertainty (±1 SD)"),
                inherit.aes = FALSE, alpha = 0.3) +
     geom_line(data = annual_full_clim, aes(date, clim_mean, linetype = "Seasonal average"),
              inherit.aes = FALSE, color = "grey40") +
     geom_line(linewidth = 0.6) +
     geom_hline(aes(yintercept = bloom_threshold, linetype = "Bloom threshold"), color = "red") +
     scale_color_manual(values = setNames(c("black", branch_color), c("Observed", branch_label)), name = NULL) +
-    scale_fill_manual(values = c("80% ensemble interval" = branch_color), name = NULL) +
+    scale_fill_manual(values = c("Uncertainty (±1 SD)" = branch_color), name = NULL) +
     scale_linetype_manual(values = c("Bloom threshold" = "dashed", "Seasonal average" = "dashed"), name = NULL) +
     scale_x_date(date_breaks = "1 month", date_labels = "%b") +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
@@ -380,8 +378,8 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
 
   p_annual_caption <- paste0("<p class='section-caption'>Chl-a trends year-to-date (",
                              format(year_start, "%b %d"), " to present) + 7-day forecast with ",
-                             "the 80% ensemble interval (10th to 90th percentile of the 100 ensemble ",
-                             "members). Hover over points for details.</p>")
+                             "the ensemble uncertainty (average plus or minus one standard deviation across the ",
+                             "100 ensemble members). Hover over points for details.</p>")
 
   p_annual_widget <- make_responsive(p_annual)
   p_annual_widget$x$data <- lapply(p_annual_widget$x$data, function(tr) {
@@ -391,8 +389,8 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     tr
   })
 
-  # stratification from the A01 CTD sensors at 1, 20, and 50 m (NERACOOS ERDDAP, daily means)
-  strat_section <- tryCatch({
+  # stratification from the A01 CTD sensors at 1m, 20m, and 50m (NERACOOS ERDDAP, daily means)
+  strat_parts <- tryCatch({
     ctd_depths <- c(1, 20, 50)
     ctd <- lapply(ctd_depths, function(dp) get_ctd_daily(buoy_id, dp))
     names(ctd) <- ctd_depths
@@ -405,7 +403,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
       hist <- hist[hist$date <= ref_date, ]
       model <- train_covariate_model(hist, "sigma_t")
       seed <- lookup_with_fallback(hist, "sigma_t", ref_date)
-      if (is.null(model) || is.na(seed)) stop("no density data at ", dp, " m")
+      if (is.null(model) || is.na(seed)) stop("no density data at ", dp, "m")
       members <- forecast_one_covariate_ens(model, ref_date, seed, n_ahead,
                                             matrix(runif(100 * n_ahead), 100, n_ahead))
       c(seed, colMeans(members))
@@ -416,21 +414,25 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     z <- sapply(seq_len(n_days), function(i) stats::approx(ctd_depths, dens[i, ], xout = depth_grid, rule = 2)$y)
     mld <- sapply(seq_len(n_days), function(i) mixed_layer_depth(ctd_depths, dens[i, ]))
     mld_y <- ifelse(is.na(mld), 52, mld)
-    mld_label <- ifelse(is.na(mld), ">50 m", paste0(round(mld), " m"))
+    mld_label <- ifelse(is.na(mld), ">50m", paste0(round(mld), "m"))
     day_label <- paste0(format(col_dates, "%a %b %d"), c("<br>observed", rep("<br>forecast", n_days - 1)))
 
     p_col <- plotly::plot_ly(x = seq_len(n_days), y = depth_grid, z = z, type = "heatmap", xgap = 14,
-                             colorscale = "Blues", reversescale = TRUE, zmin = min(z), zmax = max(z), height = 560,
-                             hovertemplate = "%{y} m: %{z:.2f} kg/m3<extra></extra>",
+                             colorscale = "Blues", reversescale = TRUE, zmin = min(z), zmax = max(z), height = 620,
+                             hovertemplate = "%{y}m: %{z:.2f} kg/m3<extra></extra>",
                              colorbar = list(title = "Density<br>(kg/m3)", y = 0.4, len = 0.7)) %>%
       plotly::add_trace(x = rep(seq_len(n_days), each = length(ctd_depths)), y = rep(ctd_depths, n_days),
-                        type = "scatter", mode = "markers", inherit = FALSE, showlegend = FALSE,
-                        marker = list(size = 7, color = "white", line = list(color = "black", width = 1)),
-                        hovertext = paste0(rep(ctd_depths, n_days), " m sensor: ", round(as.vector(t(dens)), 2), " kg/m3"),
+                        type = "scatter", mode = "markers", inherit = FALSE, name = "Sensor", showlegend = TRUE,
+                        marker = list(size = 9, color = "white", line = list(color = "black", width = 1.5)),
+                        hovertext = paste0(rep(ctd_depths, n_days), "m sensor: ", round(as.vector(t(dens)), 2), " kg/m3"),
                         hoverinfo = "text") %>%
       plotly::add_trace(x = seq_len(n_days), y = mld_y, type = "scatter", mode = "markers", inherit = FALSE,
-                        showlegend = FALSE, marker = list(symbol = "line-ew", size = 40, color = "#D55E00",
-                                                          line = list(color = "#D55E00", width = 5)),
+                        showlegend = FALSE, hoverinfo = "skip",
+                        marker = list(symbol = "line-ew", size = 40, color = "#D55E00",
+                                      line = list(color = "#D55E00", width = 5))) %>%
+      plotly::add_trace(x = seq_len(n_days), y = mld_y, type = "scatter", mode = "markers", inherit = FALSE,
+                        name = "Mixed layer depth", showlegend = TRUE,
+                        marker = list(size = 11, color = "#D55E00", line = list(color = "white", width = 1.5)),
                         hovertext = paste0("Approximate mixed layer depth: ", mld_label), hoverinfo = "text") %>%
       plotly::add_trace(x = seq_len(n_days), y = rep(-3, n_days), type = "scatter", mode = "text", inherit = FALSE,
                         showlegend = FALSE, text = mld_label, textfont = list(color = "#D55E00", size = 16),
@@ -439,10 +441,11 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
                      xaxis = list(tickvals = seq_len(n_days), ticktext = day_label, range = c(0.4, n_days + 0.6),
                                   title = "", showgrid = FALSE, zeroline = FALSE),
                      yaxis = list(title = "Depth (m)", range = c(54, -7), showgrid = FALSE, zeroline = FALSE),
-                     margin = list(t = 10)) %>%
+                     legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.2, font = list(size = 16)),
+                     margin = list(t = 10, b = 100)) %>%
       plotly::config(responsive = TRUE)
 
-    # density difference between 20 m and 1 m, year-to-date
+    # density difference between 20m and 1m, year-to-date
     strat <- merge(ctd[["1"]][, c("date", "sigma_t")], ctd[["20"]][, c("date", "sigma_t")],
                    by = "date", suffixes = c("_1", "_20"))
     strat$dsigma <- strat$sigma_t_20 - strat$sigma_t_1
@@ -457,12 +460,12 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
 
     p_strat <- ggplot(strat_ytd, aes(date, dsigma, text = hover)) +
       geom_ribbon(data = strat_clim, aes(date, ymin = clim_low, ymax = clim_high, fill = "Typical range"),
-                  inherit.aes = FALSE, alpha = 0.5) +
+                  inherit.aes = FALSE, alpha = 0.3) +
       geom_line(data = strat_clim, aes(date, clim_mean, linetype = "Seasonal average"),
-                inherit.aes = FALSE, color = "grey40") +
+                inherit.aes = FALSE, color = "red") +
       geom_line(aes(color = "Observed", group = 1), linewidth = 0.6) +
       scale_color_manual(values = c("Observed" = "black"), name = NULL) +
-      scale_fill_manual(values = c("Typical range" = "grey80"), name = NULL) +
+      scale_fill_manual(values = c("Typical range" = "#56B4E9"), name = NULL) +
       scale_linetype_manual(values = c("Seasonal average" = "dashed"), name = NULL) +
       scale_x_date(date_breaks = "1 month", date_labels = "%b") +
       labs(x = NULL, y = "Density difference (kg/m3)") +
@@ -471,44 +474,48 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     # temperature and salinity at each depth, last 90 days
     depth_long <- purrr::map_dfr(ctd_depths, function(dp) {
       d <- ctd[[as.character(dp)]] %>% filter(date >= ref_date - 90, date <= ref_date)
-      bind_rows(data.frame(date = d$date, panel = "Temperature (C)", depth = paste0(dp, " m"), value = d$temperature),
-                data.frame(date = d$date, panel = "Salinity (psu)", depth = paste0(dp, " m"), value = d$salinity))
+      bind_rows(data.frame(date = d$date, panel = "Temperature (C)", depth = paste0(dp, "m"), value = d$temperature),
+                data.frame(date = d$date, panel = "Salinity (psu)", depth = paste0(dp, "m"), value = d$salinity))
     }) %>%
       filter(!is.na(value)) %>%
       mutate(panel = factor(panel, levels = c("Temperature (C)", "Salinity (psu)")),
-             depth = factor(depth, levels = c("1 m", "20 m", "50 m")),
+             depth = factor(depth, levels = c("1m", "20m", "50m")),
              hover = paste0(format(date, "%b %d"), "<br>", depth, ": ", round(value, 2)))
 
     p_depth <- ggplot(depth_long, aes(date, value, color = depth, group = depth, text = hover)) +
       geom_line(linewidth = 0.6) +
       facet_wrap(~panel, ncol = 1, scales = "free_y") +
-      scale_color_manual(values = c("1 m" = "#D55E00", "20 m" = "#0072B2", "50 m" = "#555555"), name = NULL) +
+      scale_color_manual(values = c("1m" = "#D55E00", "20m" = "#0072B2", "50m" = "#555555"), name = NULL) +
       labs(x = NULL, y = NULL) +
       clean_theme +
       theme(strip.text = element_text(size = 16, face = "bold"))
 
-    htmltools::tagList(
-      htmltools::HTML("<p class='buoy-map-title'>Water Column Outlook</p>"),
-      htmltools::HTML(paste0("<p class='section-caption'>Water density from the surface to 50 m for the latest observed day and ",
-                             "the 7-day forecast. Darker blue is denser water, so a column that is one color is well mixed. ",
-                             "Between sensors (white dots at 1, 20, and 50 m), density is drawn as a straight line by depth. ",
-                             "The orange line, labeled above each column, is the approximate mixed layer depth, where density ",
-                             "first exceeds the 1 m value by 0.125 kg/m3 (see Documentation); &gt;50 m means mixed down to the ",
-                             "deepest sensor. Forecast columns carry each depth's recent density forward with its seasonal ",
-                             "tendency, so they show where conditions are heading rather than storms.</p>")),
-      p_col,
-      htmltools::HTML("<p class='buoy-map-title'>Water Column Stratification</p>"),
-      htmltools::HTML(paste0("<p class='section-caption'>Density difference between 20 m and 1 m depth, year-to-date. ",
-                             "Higher values mean lighter surface water is sitting on top of denser deep water (stratified), ",
-                             "values near zero mean the water column is well mixed. Hover over points for details.</p>")),
-      make_responsive(p_strat),
-      htmltools::HTML("<p class='section-caption'>Temperature and salinity at each depth over the last 90 days.</p>"),
-      make_responsive(p_depth, height = 600)
+    list(
+      col = htmltools::tagList(
+        htmltools::HTML("<p class='buoy-map-title'>Water Column Outlook</p>"),
+        htmltools::HTML(paste0("<p class='section-caption'>Water density from the surface to 50m for the latest observed day and ",
+                               "the 7-day forecast. Darker blue is denser water, so a column that is one color is well mixed. ",
+                               "Between sensors, density is drawn as a straight line by depth. Mixed layer depth is where ",
+                               "density first exceeds the 1m value by 0.125 kg/m3 (see Documentation); &gt;50m means mixed ",
+                               "down to the deepest sensor.</p>")),
+        p_col
+      ),
+      strat = htmltools::tagList(
+        htmltools::HTML("<p class='buoy-map-title'>Water Column Stratification</p>"),
+        htmltools::HTML(paste0("<p class='section-caption'>Density difference between 20m and 1m depth, year-to-date. ",
+                               "Higher values mean lighter surface water is sitting on top of denser deep water (stratified), ",
+                               "values near zero mean the water column is well mixed. Hover over points for details.</p>")),
+        make_responsive(p_strat),
+        htmltools::HTML("<p class='section-caption'>Temperature and salinity at each depth over the last 90 days.</p>"),
+        make_responsive(p_depth, height = 600)
+      )
     )
   }, error = function(e) {
     message("Stratification section skipped: ", conditionMessage(e))
-    NULL
+    list(col = NULL, strat = NULL)
   })
+  col_section <- strat_parts$col
+  strat_section <- strat_parts$strat
 
   # build Windy currents map
   buoy_lat <- cfg$buoys[[buoy_id]]$lat
@@ -539,8 +546,9 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
     htmltools::HTML(paste0("<h2 class='buoy-heading'>Site: ", buoy_name, "</h2>")),
     htmltools::HTML(status_html),
     htmltools::HTML("<p class='buoy-map-title'>7-Day Outlook</p>"),
-    htmltools::HTML("<p class='section-caption'>Each forecasted day compared to what's typical for this time of year, with the 80% ensemble interval (10th to 90th percentile of the 100 ensemble members). Hover over points for details.</p>"),
+    htmltools::HTML("<p class='section-caption'>Each forecasted day compared to what's typical for this time of year, with the ensemble uncertainty (average plus or minus one standard deviation across the 100 ensemble members). Hover over points for details.</p>"),
     p2_widget,
+    col_section,
     htmltools::HTML("<p class='buoy-map-title'>Monthly Trend</p>"),
     htmltools::HTML(p_caption),
     p_widget,

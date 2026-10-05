@@ -11,7 +11,7 @@ title: "About"
 -->
 
 BloomBoard forecasts chlorophyll at **buoy A01**, a moored ocean observing
-platform in Massachusetts Bay (about 42.52°N, 70.57°W) in roughly 65 m of
+platform in Massachusetts Bay (about 42.52°N, 70.57°W) in roughly 65m of
 water. The buoy is owned and operated by the University of Maine and is part
 of the Gulf of Maine Ocean Array run by the Northeastern Regional Association
 of Coastal Ocean Observing Systems (NERACOOS).
@@ -21,9 +21,9 @@ of Coastal Ocean Observing Systems (NERACOOS).
 Sensors on the buoy and along its mooring line record weather above the water
 and conditions at several depths below it. BloomBoard uses:
 
-- chlorophyll fluorescence at 3 m
-- water temperature, salinity, and conductivity at 1 m and 20 m
-- water temperature at 51 m
+- chlorophyll fluorescence at 3m
+- water temperature, salinity, and conductivity at 1m and 20m
+- water temperature at 51m
 - air temperature
 
 Readings arrive many times a day and are averaged to one value per day for the

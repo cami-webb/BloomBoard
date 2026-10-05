@@ -99,7 +99,9 @@ model:
   day.
 
 The spread between members is the forecast's uncertainty, and the
-average across members is the forecast. All 100 members are
+average across members is the forecast. On the Today page, the shaded
+bands and bars show the average plus or minus one standard deviation
+across the 100 members. All 100 members are
 saved for every forecast date in the Ecological Forecasting Initiative
 (EFI) standard format, one row per member per day.
 :::
@@ -108,10 +110,10 @@ saved for every forecast date in the Ecological Forecasting Initiative
 
 ::: {style="max-width: 900px; margin: 0 auto; font-size: 19px;"}
 The stratification figures on the Today page use the CTD sensors on the A01
-mooring at 1, 20, and 50 m, as daily means from the NERACOOS ERDDAP server.
+mooring at 1m, 20m, and 50m, as daily means from the NERACOOS ERDDAP server.
 
-- **Density difference**: density (sigma-t, in kg/m3) at 20 m minus density at
-  1 m, shown year-to-date against the typical range for that time of year.
+- **Density difference**: density (sigma-t, in kg/m3) at 20m minus density at
+  1m, shown year-to-date against the typical range for that time of year.
   Values near zero mean the water column is well mixed, and higher values mean
   lighter surface water is sitting on denser deep water.
 - **Water column outlook**: density by depth for the latest observed day and
@@ -119,27 +121,27 @@ mooring at 1, 20, and 50 m, as daily means from the NERACOOS ERDDAP server.
   covariates (a Random Forest uses today's value and day of year to predict
   tomorrow's, run as a 100-member ensemble, and the ensemble mean is shown).
   Between sensors, density is drawn as a straight line by depth, and it is
-  held constant above 1 m and below 50 m, so the colors between the white dots
+  held constant above 1m and below 50m, so the colors between the white dots
   are interpolated, not measured.
 - **Mixed layer depth**: the orange line on each column. It is the depth where
-  density first exceeds the density at 1 m by a threshold, found by linear
+  density first exceeds the density at 1m by a threshold, found by linear
   interpolation between sensors. If no sensor exceeds the threshold, the water
-  is reported as mixed down to the deepest sensor (>50 m).
+  is reported as mixed down to the deepest sensor (>50m).
 
 **Choice of threshold.** For profile data, the standard criterion is a density
 increase of 0.03 kg/m3 from a near-surface value (de Boyer Montégut et al.
 2004). A larger criterion of 0.125 kg/m3 (Levitus 1982)
 is also widely used. A01 has only three sensors and daily means, and on
-well-mixed winter days the density difference between 1 m and 20 m is already
+well-mixed winter days the density difference between 1m and 20m is already
 about 0.04 kg/m3 (the January median since 2008), so 0.03 kg/m3 would label
 most winter days as stratified. This page uses 0.125 kg/m3.
 
-Because the sensors are 19 m apart, depths between 1 m and 20 m are
+Because the sensors are 19m apart, depths between 1m and 20m are
 interpolated, and the estimate is best read as an index of how thick the
 surface layer is rather than a measured depth. In summer it comes out around
-2 m, shallower than the 6.5 m July climatology for the western Gulf of Maine
+2m, shallower than the 6.5m July climatology for the western Gulf of Maine
 from profile data (Cai et al. 2021). In winter it can only say the layer is
-deeper than 50 m, where profile data give about 78 m for January (Cai et al.
+deeper than 50m, where profile data give about 78m for January (Cai et al.
 2021).
 
 **References**
@@ -158,7 +160,7 @@ deeper than 50 m, where profile data give about 78 m for January (Cai et al.
 ## Bloom thresholds
 
 ::: {style="max-width: 900px; margin: 0 auto; font-size: 19px;"}
-A day counts as a bloom when the daily mean chlorophyll at 3 m is above 5
+A day counts as a bloom when the daily mean chlorophyll at 3m is above 5
 ug/L. Blooms are labeled mild (5 to 10 ug/L), moderate (10 to 20 ug/L), or
 severe (above 20 ug/L). The 5 and 20 ug/L cut-offs come from two US
 assessments of coastal chlorophyll-a. EPA's National Coastal Condition Report

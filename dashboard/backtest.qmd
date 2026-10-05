@@ -75,12 +75,10 @@ crps_ens <- function(x, y) {
   mean(abs(x - y)) - sum((2 * seq_len(n) - n - 1) * x) / n^2
 }
 
-# ensemble mean and 10th/90th percentiles for each forecast date
+# ensemble mean for each forecast date
 forecasts_raw <- ensemble_raw %>%
   group_by(ref_date, date) %>%
-  summarise(chlorophyll_forecast = mean(prediction),
-            q10 = quantile(prediction, 0.1, names = FALSE),
-            q90 = quantile(prediction, 0.9, names = FALSE), .groups = "drop") %>%
+  summarise(chlorophyll_forecast = mean(prediction), .groups = "drop") %>%
   mutate(lead_time = as.integer(date - ref_date))
 
 crps_scores <- ensemble_raw %>%
@@ -192,7 +190,7 @@ wrap_plots(patch_list) +
 ## 3-day-ahead accuracy
 
 ::: {.section-caption}
-rBias and rRMSE are for the ensemble mean. CRPS scores the full ensemble (lower is better). 80% coverage is the share of observations inside the ensemble's 10th to 90th percentile range, ideally about 80%.
+rBias and rRMSE are for the ensemble mean. CRPS scores the full ensemble (lower is better).
 :::
 
 ```{r metrics_lead3}
@@ -200,28 +198,27 @@ rBias and rRMSE are for the ensemble mean. CRPS scores the full ensemble (lower 
 #| warning: false
 scored_lead3 <- scored %>% filter(lead_time == 3)
 
-# CRPS and share of observations inside the 80% ensemble interval
+# CRPS of the full ensemble
 ensemble_scores <- function(df) {
-  tibble(CRPS = mean(df$crps), cov80 = mean(df$observed >= df$q10 & df$observed <= df$q90))
+  tibble(CRPS = mean(df$crps))
 }
 
 metrics_overall_lead3 <- bind_cols(
   compute_metrics(scored_lead3$chlorophyll_forecast, scored_lead3$observed),
   ensemble_scores(scored_lead3)
 )
-kable(metrics_overall_lead3 %>% mutate(rBias = pct(rBias), rRMSE = pct(rRMSE), cov80 = pct(cov80)) %>%
-       select(n, rBias, rRMSE, CRPS, cov80),
-     digits = 3, col.names = c("n", "rBias", "rRMSE", "CRPS", "80% coverage"), caption = "Overall")
+kable(metrics_overall_lead3 %>% mutate(rBias = pct(rBias), rRMSE = pct(rRMSE)) %>%
+       select(n, rBias, rRMSE, CRPS),
+     digits = 3, caption = "Overall")
 
 metrics_by_year_lead3 <- scored_lead3 %>%
   group_by(year, branch) %>%
   group_modify(~ bind_cols(compute_metrics(.x$chlorophyll_forecast, .x$observed), ensemble_scores(.x))) %>%
   ungroup() %>%
   mutate(branch = sub(" forecast$", "", branch))
-kable(metrics_by_year_lead3 %>% mutate(rBias = pct(rBias), rRMSE = pct(rRMSE), cov80 = pct(cov80)) %>%
-       select(year, branch, n, rBias, rRMSE, CRPS, cov80),
-     digits = 3, col.names = c("year", "branch", "n", "rBias", "rRMSE", "CRPS", "80% coverage"),
-     caption = "By year and branch")
+kable(metrics_by_year_lead3 %>% mutate(rBias = pct(rBias), rRMSE = pct(rRMSE)) %>%
+       select(year, branch, n, rBias, rRMSE, CRPS),
+     digits = 3, caption = "By year and branch")
 ```
 
 ## Predicted vs observed by lead time

@@ -15,6 +15,21 @@ s3:
 # how many days ahead to forecast
 max_horizon: 7
 
+# number of ensemble members
+ensemble:
+  n_members: 100
+  bloom_shift_quantile: 0.7
+  bloom_noise_sd:
+    day1: 0.20
+    last_day: 0.40
+
+# EFI standard forecast metadata
+efi:
+  project_id: "bu4cast"
+  model_id: "bloomboard"
+  duration: "P1D"
+  variable: "chlorophyll"
+
 # "daily" runs for today and appends today's readings to the training data
 run_mode: "daily"
 
@@ -28,8 +43,9 @@ run_mode: "daily"
 buoys:
   a01:
     name: "A01"
-    lat: 43.022942490079
-    lon: -70.5475341233827
+    site_id: "2"
+    lat: 42.52317
+    lon: -70.5655
     chlorophyll:
       sensor: "optics_s"
       variable: "chlorophyll[micrograms/liter](3m)"

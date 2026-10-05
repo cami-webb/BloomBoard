@@ -12,19 +12,20 @@ Every time it runs, it checks whether today's chlorophyll is above or
 below a bloom threshold (5 µg/L, set in `compute_bloom_threshold()` in
 `R/forecast_chlorophyll.R`) and picks one of two paths:
 
-1. **Bloom days** (`forecast_bloom()`): four random forests, trained on
+1. **Bloom days** (`forecast_bloom_ens()`): four random forests, trained on
    every past bloom, predict how high the current bloom will still peak,
    how many days it has left, how much of that time is still spent
    rising, and how fast it'll decline once it peaks. None of these are
-   recursive, they each just make one prediction. Those four numbers get
-   built into the day-by-day trajectory, which rises to the predicted
-   peak, then declines at the predicted rate (the path is then triangular).
+   recursive, they each just make one prediction per ensemble member.
+   Each member's four numbers get built into its own day-by-day
+   trajectory, which rises to the predicted peak, then declines at the
+   predicted rate (so each path is triangular), and then gets daily noise.
 
-2. **Calm days** (`forecast_calm()`): one random forest trained only on
+2. **Calm days** (`forecast_calm_ens()`): one random forest trained only on
    calm periods, predicting tomorrow's change in chlorophyll from today's
    value and the water covariates. This one is recursive, so each day's
-   prediction feeds into the next day's, using the covariate forecasts
-   from `R/forecast_covariates.R` past day one.
+   prediction feeds into the next day's, using each member's own
+   covariate forecasts from `R/forecast_covariates.R` past day one.
 
 Both paths use the same buoy covariates (`covariate_combo` in
 `config.yml`). The bloom path also gets a few extra features: days since
@@ -32,9 +33,40 @@ the bloom started, how fast it's been rising, day of year, recent
 forecast error, each covariate's 7-day trend, and how much chlorophyll
 varies within a day.
 
+The forecast is an ensemble of `ensemble: n_members` members (100 in
+`config.yml`). Instead of using the forest's average prediction, each
+member draws a random quantile level and takes the forest's prediction
+at that level (quantile regression forests, `quantreg = TRUE` in
+`ranger`), so every member is a different plausible outcome. The spread
+across members is the uncertainty and their average is the central
+forecast.
+
 Chlorophyll readings aren't available every single day, so whenever a
 forecast runs, it seeds from the most recent day that actually has a
 reading, not necessarily today (`find_seed_date()` in `R/fetch_data.R`).
+
+## Output format
+
+Each forecast is saved to S3 (`write_path` in `config.yml`) as
+`<buoy_id>-<reference date>-<model_id>.csv`, for example
+`a01-2026-10-05-bloomboard.csv`, in the EFI standard ensemble format with
+one row per member per day (100 members x 7 days = 700 rows):
+
+| Column | Value |
+|---|---|
+| `project_id` | `bu4cast` |
+| `model_id` | `bloomboard` |
+| `datetime` | the date being forecast |
+| `reference_datetime` | the date the forecast was seeded from |
+| `duration` | `P1D` (daily) |
+| `site_id` | the buoy's site id (`2` for A01) |
+| `family` | `ensemble` |
+| `parameter` | ensemble member number (1 to 100) |
+| `variable` | `chlorophyll` |
+| `prediction` | chlorophyll forecast in µg/L |
+
+The identifiers come from the `efi` block and each buoy's `site_id` in
+`config.yml`.
 
 ## Covariates
 
@@ -68,13 +100,20 @@ things like mixed-layer depth and current speed did not perform as well.
 tried at one point and came out way too low so calm days kept getting
 flagged as blooms.
 
-**The bloom models predict the 0.7 quantile, not the mean, for peak,
-duration, rise fraction, and decline rate.** All of these are
-right-skewed, most blooms are short and mild with a few big ones pulling
-the average down, so predicting the mean kept underestimating large blooms. 
-For decline rate (which is negative) the 0.7 quantile actually
-means a milder decline, which helped fix declines that were coming out
-too steep.
+**Ensemble members sample each forest's predicted distribution.** 
+With an ensemble, each member draws a random quantile level (`draw_quantile()` 
+in `R/utils.R`), so the full predicted distribution is sampled. The
+draws for the different models are independent of each other.
+
+**Bloom ensemble members are shifted upward and given daily noise.**
+Sampling each forest's distribution straight underestimates big blooms,
+so for the four bloom models the draws are centered on the 0.7 quantile
+instead of the median (`bloom_shift_quantile` in `config.yml`). This
+keeps the full spread but moves it up. Each member's trajectory then gets
+multiplicative daily noise (`bloom_noise_sd`) that grows from about 20%
+on day 1 to about 40% on day 7, since real bloom days swing around more
+than a smooth rise and decline can. The two noise values were tuned in
+the backtest so the 80% interval covers about 80% of observations.
 
 **The rise phase drops to 0 days if there's barely any rise left.**
 Otherwise a bloom that's already at or near its peak would still get a
@@ -125,7 +164,9 @@ seeing the flattened daily average.
 
 `dashboard/` is a Quarto site published on GitHub Pages. Pages:
 - `index.qmd` - "Today": current bloom status, 7-day outlook, monthly and
-  annual trend charts, currents map, per buoy.
+  annual trend charts, water column outlook and stratification charts, and a
+  currents map, per buoy.
+- `about.qmd` - "About": the A01 buoy, who uses it, and why.
 - `backtest.qmd` - "Backtest Validations": the 2021-2024 offline backtest,
   accuracy tables, out-of-bag model fit quality.
 - `documentation.qmd` - "Documentation": covariates, trajectory features,
@@ -136,7 +177,7 @@ seeing the flattened daily average.
 - `img/` - navbar logos.
 
 Three GitHub Actions workflows run it:
-- `daily.yaml` - runs `run.R` every day, plus a manual trigger. Pings a
+- `daily.yaml` - runs `run_ensemble.R` every day, plus a manual trigger. Pings a
   healthchecks.io check-in so a failed or missed run gets flagged.
 - `dashboard.yaml` - renders and publishes `index.qmd`, `documentation.qmd`,
   and `acknowledgements.qmd`, daily and on manual trigger.
@@ -157,21 +198,27 @@ touches the files it owns so they don't overwrite each other.
   and a `use_realtime` toggle. The chlorophyll entry also has a
   `calibrated_url` pointing at the QC'd data (see
   `scripts/combine_calibrated_chla.R`), used instead of the live feed
-  whenever `run_mode` is `date_range`.
+  whenever `run_mode` is `date_range`. Also holds the ensemble settings 
+  (`ensemble: n_members`, `bloom_shift_quantile`, `bloom_noise_sd`), the `efi`
+  block (project_id, model_id, duration, variable), and a `site_id` for each buoy.
 - `R/utils.R` - config loading, S3 read/write, sensor fetching, the
-  gap-tolerant covariate lookup.
+  gap-tolerant covariate lookup. Also has `draw_quantile()` (random draws from 
+  a quantile forest) and `efi_ensemble_rows()` (formats a forecast in EFI format).
 - `R/fetch_data.R` - pulls chlorophyll and covariates for a buoy and joins
   them into one daily table.
-- `R/forecast_covariates.R` - trains and recursively forecasts each water
-  covariate forward (used by the calm path).
+- `R/forecast_covariates.R` - trains and forecasts each water covariate forward 
+as an ensemble (used by the calm path).
 - `R/forecast_chlorophyll.R` - the bloom/calm dispatch and both
   forecasting paths described above.
-- `run.R` - runs everything for every configured buoy: fetch data, save
-  it, forecast covariates, forecast chlorophyll, save the forecast.
-  `run_mode` in the config decides if it's a `daily` run or a `date_range`
-  backtest, same code path either way. Backtests parallelize across dates
-  via `foreach`/`doParallel` when there's more than one core available.
-- `run.qsub` - SCC batch job for `run.R` (16 cores, for backtests).
+- `run_ensemble.R` - runs everything for every configured buoy: fetch data,
+  save it, forecast the ensemble, save it in EFI format. `run_mode` in the
+  config decides if it's a `daily` run or a `date_range` backtest, same
+  code path either way. A backtest range can also be passed directly,
+  e.g. `Rscript run_ensemble.R 2021-01-01 2021-12-31`. Dates that already
+  have a forecast on S3 are skipped, and dates run in parallel via
+  `foreach`/`doParallel` when there's more than one core available.
+- `run_ensemble.qsub` - SCC array job that runs the backtest with one task
+  per year (2021 to 2024), in parallel.
 - `dashboard/` - the Quarto site, see above.
 - `.github/workflows/` - the three workflows, see above.
 - `scripts/combine_calibrated_chla.R` - one-time script, not part of the

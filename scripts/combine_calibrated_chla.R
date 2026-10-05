@@ -1,5 +1,5 @@
 # One-time prep script combines the two calibrated chlorophyll spreadsheets into one daily CSV and uploads it to S3
-# Not part of the daily run.R workflow. rerun this manually only if new calibrated sheets show up
+# Not part of the daily workflow. rerun this manually only if new calibrated sheets show up
 
 # run from the repo root: cd BloomBoard && Rscript scripts/combine_calibrated_chla.R
 

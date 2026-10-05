@@ -1,0 +1,57 @@
+---
+title: "About"
+---
+
+::: {style="max-width: 900px; margin: 0 auto; font-size: 22px;"}
+
+## Buoy A01
+
+<!-- add the photo as dashboard/img/buoy.jpg, then uncomment this line:
+![Buoy A01 in Massachusetts Bay](img/buoy.jpg){fig-alt="Photo of buoy A01" width=70% fig-align="center"}
+-->
+
+BloomBoard forecasts chlorophyll at **buoy A01**, a moored ocean observing
+platform in Massachusetts Bay (about 42.52°N, 70.57°W) in roughly 65 m of
+water. The buoy is owned and operated by the University of Maine and is part
+of the Gulf of Maine Ocean Array run by the Northeastern Regional Association
+of Coastal Ocean Observing Systems (NERACOOS).
+
+## What it measures
+
+Sensors on the buoy and along its mooring line record weather above the water
+and conditions at several depths below it. BloomBoard uses:
+
+- chlorophyll fluorescence at 3 m
+- water temperature, salinity, and conductivity at 1 m and 20 m
+- water temperature at 51 m
+- air temperature
+
+Readings arrive many times a day and are averaged to one value per day for the
+forecast.
+
+## Who uses it and why
+
+- **Mariners**: boaters, fishermen, surfers, and pilots check buoy winds,
+  waves, and temperatures every day before heading out.
+- **Researchers**: the buoy's subsurface temperature, salinity, oxygen,
+  and biological measurements are a long record of how the Gulf of Maine
+  changes through the seasons and from year to year.
+- **Water-quality managers**: monitoring programs in Massachusetts Bay,
+  including the Massachusetts Water Resources Authority (MWRA), track
+  conditions in the bay.
+
+## Why forecast chlorophyll
+
+Chlorophyll is a measure of phytoplankton, the microscopic algae at the base of
+the ocean food web. When phytoplankton grow quickly into a bloom, they change
+water clarity and oxygen and the food available to fish and shellfish, and some
+blooms can be harmful. A forecast of when a bloom will peak and fade gives the
+people watching these waters a few days of notice. See the
+[Documentation](documentation.qmd) page for how the forecast works.
+
+## Learn more
+
+- [NERACOOS Mariners' Dashboard](https://mariners.neracoos.org/)
+- [NDBC station 44029 (buoy A01)](https://www.ndbc.noaa.gov/station_page.php?station=44029)
+
+:::

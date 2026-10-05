@@ -200,28 +200,49 @@ find_bloom_onset_info <- function(data, ref_date, threshold) {
   list(days_since_onset = count, onset_value = data$chlorophyll[data$date == onset_date][1])
 }
 
-# Bloom-day forecast: predicts peak magnitude, remaining duration, rise fraction, and decline
-# rate directly, then builds the trajectory from those numbers
-forecast_bloom <- function(train_data, ref_row, covs, ref_date, horizon, bloom_threshold) {
+# Builds chlorophyll trajectories (one row per member) from predicted peak, rise length, and decline rate
+bloom_trajectories <- function(current_state, pred_peak, rise_days, decline_rate, horizon) {
+  n_members <- length(pred_peak)
+  values <- matrix(NA_real_, n_members, horizon)
+  for (h in seq_len(horizon)) {
+    rising <- h <= rise_days
+    values[, h] <- ifelse(rising,
+                          current_state + (h / pmax(rise_days, 1)) * (pred_peak - current_state),
+                          pred_peak + (h - rise_days) * decline_rate)
+  }
+  pmax(values, 0)
+}
+
+# Bloom-day ensemble forecast: each member draws its own peak magnitude, remaining duration,
+# rise fraction, and decline rate, then builds its trajectory from those numbers
+# u_bloom: n_members x 4 matrix of random quantile levels (peak, duration, rise, decline)
+# shift_q: quantile the draws are centered on (NULL for the median)
+# noise_sd: daily noise standard deviation, one value or one per lead time
+forecast_bloom_ens <- function(train_data, ref_row, covs, ref_date, horizon, bloom_threshold,
+                               n_members, u_bloom = NULL, shift_q = NULL, noise_sd = 0) {
   models <- train_bloom_models(train_data, covs, bloom_threshold)
   if (is.null(models)) {
     message("Not enough bloom-period training data, skipping")
     return(NULL)
   }
-
+  if (is.null(u_bloom)) {
+    u_bloom <- matrix(runif(n_members * 4), n_members, 4,
+                      dimnames = list(NULL, c("peak", "duration", "rise", "decline")))
+  }
+  
   onset_info <- find_bloom_onset_info(train_data, ref_date, bloom_threshold)
   onset_day <- onset_info$days_since_onset
   onset_value <- onset_info$onset_value
   current_state <- ref_row$chlorophyll[1]
   rise_rate <- (current_state - onset_value) / onset_day
-
+  
   yesterday <- train_data$chlorophyll[train_data$date == ref_date - 1]
   day_before <- train_data$chlorophyll[train_data$date == ref_date - 2]
   recent_forecast_error <- if (length(yesterday) == 1 && length(day_before) == 1 &&
-                              !is.na(yesterday) && !is.na(day_before)) {
+                               !is.na(yesterday) && !is.na(day_before)) {
     current_state - (yesterday + (yesterday - day_before))
   } else 0
-
+  
   newdata <- data.frame(chlora_state = current_state, days_since_onset = onset_day,
                         rise_rate_since_onset = rise_rate, doy = lubridate::yday(ref_date),
                         recent_forecast_error = recent_forecast_error)
@@ -237,130 +258,130 @@ forecast_bloom <- function(train_data, ref_row, covs, ref_date, horizon, bloom_t
     # fall back to 0 if the sensor has a gap
     newdata[[paste0(cov_name, "_trend7")]] <- if (!is.na(now_val) && !is.na(past_val)) now_val - past_val else 0
   }
-
+  
   if (anyNA(newdata)) {
     message("Missing predictor at ", ref_date, ", skipping")
     return(NULL)
   }
-
-  pred_peak <- predict(models$peak_model, data = newdata, type = "quantiles",
-                       quantiles = bloom_peak_quantile)$predictions[, 1]
-  pred_peak <- max(pred_peak, current_state)   # can't be below what's already been observed
-  pred_duration_raw <- predict(models$duration_model, data = newdata, type = "quantiles",
-                               quantiles = bloom_duration_quantile)$predictions[, 1]
-  pred_remaining_duration <- max(1, round(pred_duration_raw))
-
-  # build trajectory: rise to pred_peak, then decline at decline_rate
-  rise_fraction <- if (!is.null(models$rise_fraction_model)) {
-    predict(models$rise_fraction_model, data = newdata, type = "quantiles",
-           quantiles = bloom_rise_quantile)$predictions[, 1]
-  } else {
-    compute_bloom_rise_fraction(train_data, bloom_threshold)
+  
+  # shift each model's draws so their center moves from the median to the shift_q quantile (from config)
+  qshift <- function(model) {
+    if (is.null(shift_q) || is.null(model)) return(0)
+    q <- predict(model, data = newdata, type = "quantiles", quantiles = c(0.5, shift_q))$predictions
+    q[1, 2] - q[1, 1]
   }
-  if (is.na(rise_fraction)) rise_fraction <- compute_bloom_rise_fraction(train_data, bloom_threshold)
-  rise_fraction <- min(max(rise_fraction, 0.05), 0.95)
+  
+  # one random draw per member from each model's predicted distribution
+  pred_peak <- pmax(draw_quantile(models$peak_model, newdata, u_bloom[, "peak"]) + qshift(models$peak_model),
+                    current_state)
+  pred_remaining_duration <- pmax(1, round(draw_quantile(models$duration_model, newdata, u_bloom[, "duration"]) +
+                                             qshift(models$duration_model)))
+  
+  rise_fraction <- if (!is.null(models$rise_fraction_model)) {
+    draw_quantile(models$rise_fraction_model, newdata, u_bloom[, "rise"]) + qshift(models$rise_fraction_model)
+  } else {
+    rep(compute_bloom_rise_fraction(train_data, bloom_threshold), n_members)
+  }
+  rise_fraction[is.na(rise_fraction)] <- compute_bloom_rise_fraction(train_data, bloom_threshold)
+  rise_fraction <- pmin(pmax(rise_fraction, 0.05), 0.95)
+  
   # skip rise phase if there's little predicted rise left
   rise_gap <- pred_peak - current_state
-  rise_days <- if (rise_gap <= 0.2) 0 else max(1, round(pred_remaining_duration * rise_fraction))
+  rise_days <- ifelse(rise_gap <= 0.2, 0, pmax(1, round(pred_remaining_duration * rise_fraction)))
+  
   decline_rate <- if (!is.null(models$decline_rate_model)) {
-    predict(models$decline_rate_model, data = newdata, type = "quantiles",
-           quantiles = bloom_decline_quantile)$predictions[, 1]
+    draw_quantile(models$decline_rate_model, newdata, u_bloom[, "decline"]) + qshift(models$decline_rate_model)
   } else {
-    compute_bloom_decline_rate(train_data, bloom_threshold)
+    rep(compute_bloom_decline_rate(train_data, bloom_threshold), n_members)
   }
-  if (is.na(decline_rate)) decline_rate <- 0
-
-  values <- numeric(horizon)
-  for (h in seq_len(horizon)) {
-    if (h <= rise_days) {
-      frac <- h / rise_days
-      values[h] <- current_state + frac * (pred_peak - current_state)
-    } else {
-      days_past_peak <- h - rise_days
-      values[h] <- pred_peak + days_past_peak * decline_rate
-    }
-  }
-
-  data.frame(date = ref_date + seq_len(horizon), chlorophyll_forecast = pmax(0, values))
+  decline_rate[is.na(decline_rate)] <- 0
+  
+  trajectories <- bloom_trajectories(current_state, pred_peak, rise_days, decline_rate, horizon)
+  
+  # daily noise (multiplicative, mean 1) with one standard deviation per lead time
+  sd_matrix <- matrix(rep_len(noise_sd, horizon), n_members, horizon, byrow = TRUE)
+  trajectories * exp(matrix(rnorm(n_members * horizon), n_members, horizon) * sd_matrix - sd_matrix^2 / 2)
 }
 
 # Trains a simple RF on calm-only day-to-day transitions (today's value and covariates predict tomorrow's change)
-train_calm_model <- function(data, covs, bloom_threshold, importance = "none") {
+train_calm_model <- function(data, covs, bloom_threshold, importance = "none", quantreg = TRUE) {
   d <- data[order(data$date), ]
   full_delta <- dplyr::lead(d$chlorophyll) - d$chlorophyll
   is_calm <- !is.na(d$chlorophyll) & d$chlorophyll <= bloom_threshold
-
+  
   panel <- data.frame(chlora_state = d$chlorophyll, chlora_delta_target = full_delta)
   for (cov_name in covs) panel[[cov_name]] <- d[[cov_name]]
   panel <- panel[is_calm, ]
   panel <- panel[stats::complete.cases(panel), ]
   if (nrow(panel) < 10) return(NULL)
-
+  
   form <- as.formula(paste("chlora_delta_target ~ chlora_state +",
                            paste0("`", covs, "`", collapse = " + ")))
   fit <- ranger::ranger(form, data = panel, num.trees = 200, min.node.size = 5, num.threads = 1,
-                        importance = importance, seed = 42)
+                        quantreg = quantreg, importance = importance, seed = 42)
   attr(fit, "target_mean") <- mean(panel$chlora_delta_target)
   fit
 }
 
-# Calm-day forecast: simple recursive using forecasted covariates, where flattening toward a stable
-# baseline is realistic
-forecast_calm <- function(train_data, ref_row, covariate_forecast, covs, ref_date, horizon, bloom_threshold) {
+# Calm-day ensemble forecast: recursive, each member uses its own forecasted covariates
+# cov_ens: array [member, day, covariate] from forecast_covariates_ens()
+# u_chl: n_members x horizon matrix of random quantile levels
+forecast_calm_ens <- function(train_data, ref_row, cov_ens, covs, ref_date, horizon, bloom_threshold,
+                              n_members, u_chl = NULL) {
   model <- train_calm_model(train_data, covs, bloom_threshold)
   if (is.null(model)) {
     message("Not enough calm-period training data, skipping")
     return(NULL)
   }
-
-  predictions <- numeric(horizon)
-  current_state <- ref_row$chlorophyll[1]
-
+  if (is.null(u_chl)) u_chl <- matrix(runif(n_members * horizon), n_members, horizon)
+  
+  members <- matrix(NA_real_, n_members, horizon)
+  current <- rep(ref_row$chlorophyll[1], n_members)
+  
   for (h in seq_len(horizon)) {
-    target_date <- ref_date + h
     if (h == 1) {
       # real covariates on ref_date w/ gap-tolerant fallback
-      cov_row <- as.data.frame(lapply(covs, function(cn) lookup_with_fallback(train_data, cn, ref_date)))
-      names(cov_row) <- covs
+      real_cov <- as.data.frame(lapply(covs, function(cn) lookup_with_fallback(train_data, cn, ref_date)))
+      names(real_cov) <- covs
+      cov_now <- real_cov[rep(1, n_members), , drop = FALSE]
     } else {
-      cov_row <- covariate_forecast[covariate_forecast$date == target_date, covs, drop = FALSE]
+      cov_now <- as.data.frame(matrix(cov_ens[, h, ], nrow = n_members, dimnames = list(NULL, covs)))
     }
-    if (nrow(cov_row) == 0 || anyNA(cov_row)) {
-      predictions[h:horizon] <- NA_real_
-      break
-    }
-
-    newdata <- cov_row
-    newdata$chlora_state <- current_state
-    pred_delta <- predict(model, data = newdata)$predictions
-    pred <- pmax(0, current_state + pred_delta)
-    predictions[h] <- pred
-    current_state <- pred
+    if (anyNA(cov_now)) break
+    
+    newdata <- cov_now
+    newdata$chlora_state <- current
+    delta <- draw_quantile(model, newdata, u_chl[, h])
+    current <- pmax(0, current + delta)
+    members[, h] <- current
   }
-
-  data.frame(date = ref_date + seq_len(horizon), chlorophyll_forecast = predictions)
+  members
 }
 
 # data: the buoy's full daily training table (date, chlorophyll, covariates)
-# covariate_forecast: output of forecast_covariates() for the same ref_date/horizon
-forecast_chlorophyll <- function(cfg, buoy_id, data, covariate_forecast, ref_date, horizon,
-                                 bloom_threshold = NULL) {
+# Returns an n_members x horizon matrix of chlorophyll forecasts (NULL if no forecast possible)
+forecast_chlorophyll_ens <- function(cfg, buoy_id, data, ref_date, horizon, n_members,
+                                     bloom_threshold = NULL) {
   buoy <- cfg$buoys[[buoy_id]]
   covs <- buoy$covariate_combo
   if (length(covs) == 0) covs <- names(buoy$covariates)
-
+  
   train_data <- data[data$date <= ref_date, ]
   if (is.null(bloom_threshold)) bloom_threshold <- compute_bloom_threshold(train_data)
-
+  
   ref_row <- data[data$date == ref_date, ]
   if (nrow(ref_row) == 0 || is.na(ref_row$chlorophyll[1])) {
     message("No real chlorophyll seed value for ", ref_date, ", skipping")
     return(NULL)
   }
-
+  
   if (ref_row$chlorophyll[1] > bloom_threshold) {
-    forecast_bloom(train_data, ref_row, covs, ref_date, horizon, bloom_threshold)
-  } else {
-    forecast_calm(train_data, ref_row, covariate_forecast, covs, ref_date, horizon, bloom_threshold)
+    noise <- cfg$ensemble$bloom_noise_sd
+    noise_sd <- noise$day1 + (noise$last_day - noise$day1) * (seq_len(horizon) - 1) / max(horizon - 1, 1)
+    forecast_bloom_ens(train_data, ref_row, covs, ref_date, horizon, bloom_threshold, n_members,
+                       shift_q = cfg$ensemble$bloom_shift_quantile, noise_sd = noise_sd)
+    } else {
+    cov_ens <- forecast_covariates_ens(cfg, buoy_id, data, ref_date, horizon, n_members)
+    forecast_calm_ens(train_data, ref_row, cov_ens, covs, ref_date, horizon, bloom_threshold, n_members)
   }
 }

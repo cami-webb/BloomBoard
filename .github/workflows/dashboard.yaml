@@ -41,13 +41,14 @@ jobs:
           quarto render dashboard/index.qmd
           quarto render dashboard/documentation.qmd
           quarto render dashboard/acknowledgements.qmd
+          quarto render dashboard/about.qmd
 
       - name: Publish to gh-pages
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
           mkdir -p /tmp/pages
-          cp dashboard/_site/index.html dashboard/_site/documentation.html dashboard/_site/acknowledgements.html /tmp/pages/
+          cp dashboard/_site/index.html dashboard/_site/documentation.html dashboard/_site/acknowledgements.html dashboard/_site/about.html dashboard/_site/a01_forecast.csv /tmp/pages/
           git fetch origin gh-pages || true
           rm -rf /tmp/gh-pages-wt
           if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
@@ -56,9 +57,9 @@ jobs:
             git worktree add --orphan -b gh-pages /tmp/gh-pages-wt
           fi
           cd /tmp/gh-pages-wt
-          find . -maxdepth 1 -type f ! -name '.git' ! -name 'index.html' ! -name 'documentation.html' ! -name 'acknowledgements.html' ! -name 'backtest.html' -delete
+          find . -maxdepth 1 -type f ! -name '.git' ! -name 'index.html' ! -name 'documentation.html' ! -name 'acknowledgements.html' ! -name 'about.html' ! -name 'a01_forecast.csv' ! -name 'backtest.html' -delete
           find . -mindepth 1 -maxdepth 1 -type d ! -name '.git' -exec rm -rf {} +
-          cp /tmp/pages/*.html .
+          cp /tmp/pages/* .
           git add -A
           git commit -m "update dashboard" || echo "nothing to commit"
           git push origin gh-pages

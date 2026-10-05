@@ -25,7 +25,7 @@ jobs:
 
       - name: Run BloomBoard
         run: |
-          Rscript run.R
+          Rscript run_ensemble.R
 
       - name: Ping healthcheck
         run: |

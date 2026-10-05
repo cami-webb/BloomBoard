@@ -52,21 +52,42 @@ fc_keys <- aws.s3::get_bucket_df(
   base_url = cfg$s3$base_url, use_https = TRUE, region = "",
   key = Sys.getenv("OSN_KEY"), secret = Sys.getenv("OSN_SECRET"), max = Inf
 )$Key
+fc_keys <- fc_keys[grepl(paste0("-", cfg$efi$model_id, "\\.csv$"), fc_keys)]
 
 read_one_forecast <- function(key) {
-  ref_date <- as.Date(sub(paste0(buoy_id, "-(.*)-forecast\\.csv"), "\\1", basename(key)))
   tmp <- tempfile(fileext = ".csv")
   aws.s3::save_object(object = key, bucket = cfg$s3$bucket, file = tmp,
                       base_url = cfg$s3$base_url, use_https = TRUE, region = "",
                       key = Sys.getenv("OSN_KEY"), secret = Sys.getenv("OSN_SECRET"))
-  d <- readr::read_csv(tmp, show_col_types = FALSE)
+  d <- readr::read_csv(tmp, show_col_types = FALSE,
+                       col_select = c(reference_datetime, datetime, parameter, prediction))
   unlink(tmp)
-  d$ref_date <- ref_date
   d
 }
 
-forecasts_raw <- purrr::map_dfr(fc_keys, read_one_forecast) %>%
+ensemble_raw <- purrr::map_dfr(fc_keys, read_one_forecast) %>%
+  rename(ref_date = reference_datetime, date = datetime)
+
+# continuous ranked probability score of one ensemble forecast against its observation
+crps_ens <- function(x, y) {
+  x <- sort(x)
+  n <- length(x)
+  mean(abs(x - y)) - sum((2 * seq_len(n) - n - 1) * x) / n^2
+}
+
+# ensemble mean and 10th/90th percentiles for each forecast date
+forecasts_raw <- ensemble_raw %>%
+  group_by(ref_date, date) %>%
+  summarise(chlorophyll_forecast = mean(prediction),
+            q10 = quantile(prediction, 0.1, names = FALSE),
+            q90 = quantile(prediction, 0.9, names = FALSE), .groups = "drop") %>%
   mutate(lead_time = as.integer(date - ref_date))
+
+crps_scores <- ensemble_raw %>%
+  inner_join(real_range %>% rename(observed = chlorophyll), by = "date") %>%
+  filter(!is.na(observed)) %>%
+  group_by(ref_date, date) %>%
+  summarise(crps = crps_ens(prediction, first(observed)), .groups = "drop")
 
 ref_state <- data %>%
   select(ref_date = date, ref_chl = chlorophyll) %>%
@@ -77,6 +98,7 @@ forecasts <- forecasts_raw %>%
 
 scored <- forecasts %>%
   left_join(real_range %>% rename(observed = chlorophyll), by = "date") %>%
+  left_join(crps_scores, by = c("ref_date", "date")) %>%
   filter(!is.na(observed), !is.na(chlorophyll_forecast)) %>%
   mutate(year = format(ref_date, "%Y"))
 
@@ -93,7 +115,7 @@ compute_metrics <- function(pred, obs) {
     RMSE = sqrt(mean(err^2)),
     rRMSE = sqrt(mean(err^2)) / obs_mean,
     R2 = if (ss_tot > 0) 1 - ss_res / ss_tot else NA_real_,
-    CRPS = mean(abs(err))
+    MAE = mean(abs(err))
   )
 }
 ```
@@ -102,6 +124,7 @@ compute_metrics <- function(pred, obs) {
 
 Each row is one year. Full trajectory: every forecast's lead 1-5 days.
 3-day-ahead: only the 3-day-ahead point from each forecast.
+Both show the ensemble mean.
 
 ```{r panel_plot}
 #| echo: false
@@ -113,7 +136,7 @@ Each row is one year. Full trajectory: every forecast's lead 1-5 days.
 years <- 2021:2024
 PLOT_LEAD_LIMIT <- 5
 
-LABEL_SIZE <- 13
+LABEL_SIZE <- 16
 year_panels <- purrr::map(years, function(yr) {
   yr_start <- as.Date(paste0(yr, "-01-01"))
   yr_end <- as.Date(paste0(yr, "-12-31"))
@@ -129,7 +152,7 @@ year_panels <- purrr::map(years, function(yr) {
     scale_color_manual(values = c("Bloom forecast" = "#E69F00", "Calm forecast" = "#0072B2"), name = NULL) +
     coord_cartesian(xlim = c(yr_start, yr_end)) +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
-    theme_bw(base_size = 30, base_family = "barlow")
+    theme_bw(base_size = 36, base_family = "barlow")
 
   fc_yr3 <- forecasts %>% filter(ref_date >= yr_start, ref_date <= yr_end, lead_time == 3)
   p_lead3 <- ggplot() +
@@ -139,7 +162,7 @@ year_panels <- purrr::map(years, function(yr) {
     scale_color_manual(values = c("Bloom forecast" = "#E69F00", "Calm forecast" = "#0072B2"), name = NULL) +
     coord_cartesian(xlim = c(yr_start, yr_end)) +
     labs(x = NULL, y = "Chlorophyll (ug/L)") +
-    theme_bw(base_size = 30, base_family = "barlow")
+    theme_bw(base_size = 36, base_family = "barlow")
 
   list(overview = p_overview, lead3 = p_lead3)
 })
@@ -163,27 +186,42 @@ design <- purrr::map(seq_len(n_rows), function(r) {
 wrap_plots(patch_list) +
   plot_layout(design = reduce(design, c), widths = c(0.06, 1, 1),
              heights = c(0.12, rep(1, length(years))), guides = "collect") &
-  theme(legend.text = element_text(size = 32), legend.title = element_text(size = 32))
+  theme(legend.text = element_text(size = 38), legend.title = element_text(size = 38))
 ```
 
 ## 3-day-ahead accuracy
+
+::: {.section-caption}
+rBias and rRMSE are for the ensemble mean. CRPS scores the full ensemble (lower is better). 80% coverage is the share of observations inside the ensemble's 10th to 90th percentile range, ideally about 80%.
+:::
 
 ```{r metrics_lead3}
 #| echo: false
 #| warning: false
 scored_lead3 <- scored %>% filter(lead_time == 3)
 
-metrics_overall_lead3 <- compute_metrics(scored_lead3$chlorophyll_forecast, scored_lead3$observed)
-kable(metrics_overall_lead3 %>% mutate(rBias = pct(rBias), rRMSE = pct(rRMSE)) %>% select(n, rBias, rRMSE),
-     digits = 3, caption = "Overall")
+# CRPS and share of observations inside the 80% ensemble interval
+ensemble_scores <- function(df) {
+  tibble(CRPS = mean(df$crps), cov80 = mean(df$observed >= df$q10 & df$observed <= df$q90))
+}
+
+metrics_overall_lead3 <- bind_cols(
+  compute_metrics(scored_lead3$chlorophyll_forecast, scored_lead3$observed),
+  ensemble_scores(scored_lead3)
+)
+kable(metrics_overall_lead3 %>% mutate(rBias = pct(rBias), rRMSE = pct(rRMSE), cov80 = pct(cov80)) %>%
+       select(n, rBias, rRMSE, CRPS, cov80),
+     digits = 3, col.names = c("n", "rBias", "rRMSE", "CRPS", "80% coverage"), caption = "Overall")
 
 metrics_by_year_lead3 <- scored_lead3 %>%
   group_by(year, branch) %>%
-  group_modify(~ compute_metrics(.x$chlorophyll_forecast, .x$observed)) %>%
+  group_modify(~ bind_cols(compute_metrics(.x$chlorophyll_forecast, .x$observed), ensemble_scores(.x))) %>%
   ungroup() %>%
   mutate(branch = sub(" forecast$", "", branch))
-kable(metrics_by_year_lead3 %>% mutate(rBias = pct(rBias), rRMSE = pct(rRMSE)) %>%
-       select(year, branch, n, rBias, rRMSE), digits = 3, caption = "By year and branch")
+kable(metrics_by_year_lead3 %>% mutate(rBias = pct(rBias), rRMSE = pct(rRMSE), cov80 = pct(cov80)) %>%
+       select(year, branch, n, rBias, rRMSE, CRPS, cov80),
+     digits = 3, col.names = c("year", "branch", "n", "rBias", "rRMSE", "CRPS", "80% coverage"),
+     caption = "By year and branch")
 ```
 
 ## Predicted vs observed by lead time
@@ -209,9 +247,9 @@ scatter_plots <- purrr::map(c(1, 3, 5, 7), function(lt) {
     scale_color_manual(values = c("Bloom forecast" = "#E69F00", "Calm forecast" = "#0072B2"), name = NULL) +
     coord_equal() +
     labs(x = "Observed (ug/L)", y = "Forecast (ug/L)", title = paste0(lt, "-day ahead")) +
-    theme_bw(base_size = 24, base_family = "barlow") +
-    theme(plot.title = element_text(face = "bold", size = 32),
-         legend.text = element_text(size = 24), legend.title = element_text(size = 24))
+    theme_bw(base_size = 30, base_family = "barlow") +
+    theme(plot.title = element_text(face = "bold", size = 38),
+         legend.text = element_text(size = 30), legend.title = element_text(size = 30))
 })
 
 wrap_plots(scatter_plots, ncol = 2, guides = "collect")

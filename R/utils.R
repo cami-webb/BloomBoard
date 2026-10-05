@@ -144,3 +144,30 @@ resolve_run_dates <- function(cfg) {
   }
   seq(as.Date(cfg$date_range$start), as.Date(cfg$date_range$end), by = "day")
 }
+
+# One random draw per ensemble member from a quantile-regression RF's predicted distribution
+# u: random quantile levels (one per member). newdata is either one row shared by all members or one row per member
+draw_quantile <- function(fit, newdata, u) {
+  q <- predict(fit, data = newdata, type = "quantiles", quantiles = u)$predictions
+  q <- matrix(q, nrow = nrow(newdata))
+  if (nrow(newdata) == 1) return(as.numeric(q))
+  q[cbind(seq_along(u), seq_along(u))]
+}
+
+# Formats an n_members x horizon forecast matrix as an (EFI standard) ensemble forecast
+efi_ensemble_rows <- function(members, ref_date, cfg, buoy_id) {
+  n_members <- nrow(members)
+  horizon <- ncol(members)
+  data.frame(
+    project_id = cfg$efi$project_id,
+    model_id = cfg$efi$model_id,
+    datetime = rep(ref_date + seq_len(horizon), each = n_members),
+    reference_datetime = ref_date,
+    duration = cfg$efi$duration,
+    site_id = cfg$buoys[[buoy_id]]$site_id,
+    family = "ensemble",
+    parameter = rep(seq_len(n_members), times = horizon),
+    variable = cfg$efi$variable,
+    prediction = as.vector(members)
+  )
+}

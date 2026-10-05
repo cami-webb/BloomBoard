@@ -17,6 +17,8 @@ website:
         href: backtest.qmd
       - text: "Documentation"
         href: documentation.qmd
+      - text: "About"
+        href: about.qmd
       - text: "Acknowledgements"
         href: acknowledgements.qmd
 

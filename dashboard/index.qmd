@@ -82,6 +82,7 @@ doy_climatology <- function(data, target_date, window = 5, column = "chlorophyll
 #| echo: false
 #| results: asis
 #| warning: false
+latest_data_date <- as.Date(NA)
 buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   buoy_name <- cfg$buoys[[buoy_id]]$name
   data <- read_s3_csv(cfg, cfg$s3$write_path, paste0(buoy_id, "_training_data.csv"))
@@ -94,6 +95,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   readr::write_csv(fc_list$raw, file.path("_site", csv_filename))
 
   ref_date <- fc$ref_date[1]
+  latest_data_date <<- max(latest_data_date, ref_date, na.rm = TRUE)
   recent <- data %>% filter(date >= ref_date - 30, date <= ref_date) %>% select(date, chlorophyll)
   today_val <- data$chlorophyll[data$date == ref_date][1]
   branch <- if (!is.na(today_val) && today_val > bloom_threshold) "Bloom" else "Calm"
@@ -553,8 +555,10 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   )
 })
 
+header_date <- if (is.na(latest_data_date)) "No data available" else format(latest_data_date, "%B %d, %Y")
 htmltools::tagList(
-  htmltools::HTML(paste0("<p class='today-line'>Today, ", format(Sys.Date(), "%B %d, %Y"), "</p>")),
+  htmltools::HTML(paste0("<p class='today-line'>", header_date,
+                         "<br><span class='today-note'>Data updates daily at 17:30 UTC</span></p>")),
   buoy_sections
 )
 ```

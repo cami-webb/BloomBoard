@@ -104,6 +104,11 @@ format:
           color: #444;
           margin: 0.5rem 0 2.5rem 0;
         }
+        .today-note {
+          font-size: 1.2rem;
+          font-weight: 500;
+          color: #666;
+        }
         .buoy-heading {
           text-align: left;
           max-width: 1000px;

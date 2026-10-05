@@ -177,10 +177,10 @@ seeing the flattened daily average.
 - `img/` - navbar logos.
 
 Three GitHub Actions workflows run it:
-- `daily.yaml` - runs `run_ensemble.R` every day, plus a manual trigger. Pings a
+- `daily.yaml` - runs `run_ensemble.R` every day at 17:00 UTC, plus a manual trigger. Pings a
   healthchecks.io check-in so a failed or missed run gets flagged.
 - `dashboard.yaml` - renders and publishes `index.qmd`, `documentation.qmd`,
-  and `acknowledgements.qmd`, daily and on manual trigger.
+  and `acknowledgements.qmd`, daily at 17:30 UTC and on manual trigger.
 - `backtest-page.yaml` - renders and publishes `backtest.qmd` on its own,
   manual trigger only, since it pulls ~1500 historical files and doesn't
   actually change day to day.

@@ -29,7 +29,7 @@ and conditions at several depths below it. BloomBoard uses:
 Readings arrive many times a day and are averaged to one value per day for the
 forecast.
 
-## Who uses it and why
+## Who uses it and why?
 
 - **Mariners**: boaters, fishermen, surfers, and pilots check buoy winds,
   waves, and temperatures every day before heading out.
@@ -40,7 +40,7 @@ forecast.
   including the Massachusetts Water Resources Authority (MWRA), track
   conditions in the bay.
 
-## Why forecast chlorophyll
+## Why forecast chlorophyll?
 
 Chlorophyll is a measure of phytoplankton, the microscopic algae at the base of
 the ocean food web. When phytoplankton grow quickly into a bloom, they change

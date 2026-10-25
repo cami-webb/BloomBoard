@@ -2,8 +2,8 @@ name: BloomBoard Dashboard
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '30 17 * * *'
+#  schedule:
+#    - cron: '30 17 * * *'
 
 permissions:
   contents: write

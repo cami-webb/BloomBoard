@@ -59,11 +59,12 @@ latest_forecast_for <- function(cfg, buoy_id) {
   keys <- keys[grepl(paste0("-", cfg$efi$model_id, "\\.csv$"), keys)]
   if (length(keys) == 0) return(NULL)
   ref_dates <- as.Date(sub(paste0(buoy_id, "-(.*)-", cfg$efi$model_id, "\\.csv"), "\\1", basename(keys)))
-  raw <- read_s3_csv(cfg, cfg$s3$write_path, basename(keys[which.max(ref_dates)]))
+  pick <- if (is.na(DEMO_DATE)) which.max(ref_dates) else which(ref_dates == DEMO_DATE)
+  raw <- read_s3_csv(cfg, cfg$s3$write_path, basename(keys[pick]))
   summary <- raw %>%
     group_by(date = as.Date(datetime)) %>%
     summarise(chlorophyll_forecast = mean(prediction), sd = sd(prediction), .groups = "drop") %>%
-    mutate(ref_date = max(ref_dates))
+    mutate(ref_date = ref_dates[pick])
   list(raw = raw, summary = summary)
 }
 

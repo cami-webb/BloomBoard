@@ -15,6 +15,9 @@ library(purrr)
 cfg <- load_config("../config.yml")
 bloom_threshold <- 5
 
+# set to a past date to show the page as of that day, or NA for live
+DEMO_DATE <- as.Date("2026-03-28")
+
 clean_theme <- theme_minimal(base_size = 13) +
   theme(panel.grid.minor = element_blank(),
        plot.title = element_text(face = "bold", size = 26),

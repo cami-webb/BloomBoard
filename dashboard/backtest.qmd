@@ -280,5 +280,8 @@ oob_table <- bind_rows(
   oob_row(imp_bloom_models$rise_fraction_model, "Bloom: rise_fraction_model", "rise_fraction (unitless)"),
   oob_row(imp_bloom_models$decline_rate_model, "Bloom: decline_rate_model", "decline_rate (ug/L/day)")
 )
-kable(oob_table, digits = 3, caption = "Each model's out-of-bag accuracy against target. The decline rate model has a smaller n because it excludes bloom days from events that peak on their last observed day.")
+kable(oob_table, digits = 3, caption = "Each model's out-of-bag accuracy against target")
 ```
+::: {.model-note style="text-align: center;"}
+Note: the decline rate model has a smaller n because it excludes bloom days from events that peak on their last observed day.
+:::

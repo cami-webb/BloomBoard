@@ -2,4 +2,14 @@
 title: "Acknowledgements"
 ---
 
-Coming soon.
+::: {style="max-width: 900px; margin: 0 auto; font-size: 22px;"}
+
+BloomBoard was made possible by the following people and organizations.
+
+- **Boston University Hariri Focused Research Program (FRP)** for funding and support of this work.
+- **Massachusetts Water Resources Authority (MWRA)** for their collaboration and support.
+- **Northeastern Regional Association of Coastal Ocean Observing Systems (NERACOOS)** for running the buoy network.
+- **University of Maine Ocean Observing System (UMOOS)** for the maintenance and deployment of the A01 buoy.
+- **Dr. Collin Roesler, Bowdoin College**, for calibrating the chlorophyll-a data.
+
+:::

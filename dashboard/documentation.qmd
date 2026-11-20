@@ -77,12 +77,7 @@ flowchart TD
 The forecast is an ensemble of 100 members.
 Each Random Forest is a quantile regression forest, so for a given set
 of inputs it estimates the full distribution of the value it is
-predicting, not just the average. It does this by collecting the past
-observations that landed in the same leaves as the current inputs across
-all of the forest's trees, weighting each by how often it shares a leaf.
-To draw one member's value, a random quantile level between 0 and 1 is
-picked and the value at that quantile of the weighted distribution is
-used (inverse transform sampling). What gets sampled depends on the
+predicting, not just the average. What gets sampled depends on the
 model:
 
 - **Bloom day**: each member draws its own peak, duration, rise
@@ -122,7 +117,7 @@ mooring at 1m, 20m, and 50m, as daily means from the NERACOOS ERDDAP server.
   tomorrow's, run as a 100-member ensemble, and the ensemble mean is shown).
   Between sensors, density is drawn as a straight line by depth, and it is
   held constant above 1m and below 50m, so the colors between the white dots
-  are interpolated, not measured.
+  are interpolated (not measured).
 - **Mixed layer depth**: the orange line on each column. It is the depth where
   density first exceeds the density at 1m by a threshold, found by linear
   interpolation between sensors. If no sensor exceeds the threshold, the water
@@ -227,9 +222,9 @@ and weather-forecast covariates) was cross-validated
 against each other (about 237,000 model/covariate combinations in
 total). Random Forest came out with the lowest cross-validated error: 
 RMSE of about 0.27, compared to roughly 0.30 for
-XGBoost, 0.38 for dGAM, and 0.77 for the plain ARIMA baseline.
+XGBoost, 0.38 for dGAM, and 0.77 for ARIMA.
 
-The same search is also how the covariates were chosen: water
+The same search is also how the covariates were chosen. Water
 temperature, conductivity, salinity, and air temperature consistently
 ranked among the best-performing combinations, while other candidates
 that were tried, like mixed-layer depth and current speed, didn't make
@@ -237,8 +232,7 @@ the cut. This was validated by a few full test runs with these covariates
 to confirm that there was no missing signal from other unincluded covariates.
 
 Early versions of the forecast produced a single line per day.
-The current version produces a 100-member ensemble, so the
-uncertainty comes directly from the forecast itself.
+The current version produces a 100-member ensemble.
 
 For more details, see full Documentation in the BloomBoard GitHub (https://github.com/cami-webb/BloomBoard)
 :::

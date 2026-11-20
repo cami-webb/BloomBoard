@@ -4,7 +4,7 @@ BloomBoard forecasts chlorophyll up to `max_horizon` days out at a buoy,
 using a chlorophyll reading and the buoy's own water sensors as the
 starting point. No weather forecast data goes into it.
 
-Check out the live site: [github.com/cami-webb/BloomBoard](https://github.com/cami-webb/BloomBoard).
+Check out the live site: https://cami-webb.github.io/BloomBoard/
 
 ## How the forecast works
 
@@ -23,7 +23,8 @@ below a bloom threshold (5 µg/L, set in `compute_bloom_threshold()` in
 
 2. **Calm days** (`forecast_calm_ens()`): one random forest trained only on
    calm periods, predicting tomorrow's change in chlorophyll from today's
-   value and the water covariates. This one is recursive, so each day's
+   value and the water covariates (which are also forecasted in their own
+   random forests 7-days out). This one is recursive, so each day's
    prediction feeds into the next day's, using each member's own
    covariate forecasts from `R/forecast_covariates.R` past day one.
 

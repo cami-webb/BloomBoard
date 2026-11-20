@@ -105,7 +105,7 @@ buoy_sections <- lapply(names(cfg$buoys), function(buoy_id) {
   data_status_html <- paste0("<p class='data-status'>Data current as of <strong>",
                              format(ref_date, "%B %d, %Y"), "</strong></p>")
   gap_warning_html <- if (days_gap > 2) {
-    paste0("<p class='data-warning'>Warning: data not received for ", days_gap, " days</p>")
+    paste0("<p class='data-warning'>Warning: buoy data not received for ", days_gap, " days</p>")
   } else {
     ""
   }
